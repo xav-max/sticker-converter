@@ -1,0 +1,30 @@
+version: "3.8"
+
+services:
+  sticker-converter:
+    # Build the image from this project so the latest public/ UI is included.
+    build: .
+    
+    # ====== SYNOLOGY PORTAINER NAS USAGE ======
+    # For Portainer deployments without local source files, publish the image
+    # built here to a registry and replace the build setting with this image.
+    image: sticker_converter:latest
+
+    container_name: sticker_converter
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+      
+    environment:
+      # PUID and PGID are useful for Synology NAS only if you map volumes, 
+      # ensuring the container creates files with your user permissions instead of root.
+      # You can find these via SSH using the "id" command.
+      - PUID=1026
+      - PGID=100
+      - NODE_ENV=production
+      
+    # Note: The server natively processes zip files statelessly in temp memory.
+    # You do NOT need to map volumes for the Drag & Drop interface to work!
+    # ---------------------------------------------------------
+    # volumes:
+    #   - /volume1/docker/sticker_converter/tmp:/tmp
