@@ -200,8 +200,8 @@
                                 </span>
                                 <h3>Drop your ZIP archive here</h3>
                                 <p>or click to browse files on your device</p>
-                                <span class="drop-hint">ZIP archive · GIF animations · PNG assets</span>
-                                <input type="file" name="stickerZip" id="fileInput" accept=".zip" required hidden>
+                                <span class="drop-hint">ZIP archive or a single GIF / PNG</span>
+                                <input type="file" name="stickerZip" id="fileInput" accept=".zip,.gif,.png" required hidden>
                             </div>
                         </div>
 
@@ -344,11 +344,11 @@
         dropZone.addEventListener('drop', (e) => {
             let dt = e.dataTransfer;
             let files = dt.files;
-            if (files.length > 0 && files[0].name.endsWith('.zip')) {
+            if (files.length > 0 && /\.(zip|gif|png)$/i.test(files[0].name)) {
                 fileInput.files = files;
                 updateFilePreview();
             } else {
-                showStatus('Please upload a valid .zip file!', 'error');
+                showStatus('Please upload a .zip, .gif or .png file!', 'error');
             }
         });
 

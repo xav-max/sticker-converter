@@ -28,8 +28,14 @@ app.post('/upload', upload.single('stickerZip'), async (req, res) => {
         fs.mkdirSync(extractDir, { recursive: true });
         fs.mkdirSync(outputDir, { recursive: true });
 
-        const zip = new AdmZip(uploadedZipPath);
-        zip.extractAllTo(extractDir, true);
+        const originalName = path.basename(req.file.originalname || '');
+        if (/\.(gif|png)$/i.test(originalName)) {
+            // Single image: place it directly in the input folder
+            fs.copyFileSync(uploadedZipPath, path.join(extractDir, originalName));
+        } else {
+            const zip = new AdmZip(uploadedZipPath);
+            zip.extractAllTo(extractDir, true);
+        }
         fs.unlinkSync(uploadedZipPath);
 
         // Start processing asynchronously
