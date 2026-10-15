@@ -22,16 +22,16 @@ app.post('/upload', upload.single('stickerZip'), async (req, res) => {
     const extractDir = path.join('/tmp/processing', sessionId, 'input');
     const outputDir = path.join('/tmp/processing', sessionId, 'output');
 
-    activeSessions[sessionId] = { clients: [] };
+    activeSessions[sessionId] = { clients: [], events: [] };
 
     try {
         fs.mkdirSync(extractDir, { recursive: true });
         fs.mkdirSync(outputDir, { recursive: true });
 
-        const originalName = path.basename(req.file.originalname || '');
+        const originalName = path.basename(Buffer.from(req.file.originalname || '', 'latin1').toString('utf8'));
         if (/\.(gif|png)$/i.test(originalName)) {
             // Single image: place it directly in the input folder
-            fs.copyFileSync(uploadedZipPath, path.join(extractDir, originalName));
+            fs.copyFileSync(uploadedZipPath, path.join(extractDir, originalName.replace(/[\\/:*?"<>|\n\r]/g, '_')));
         } else {
             const zip = new AdmZip(uploadedZipPath);
             zip.extractAllTo(extractDir, true);
@@ -44,6 +44,7 @@ app.post('/upload', upload.single('stickerZip'), async (req, res) => {
 
         const broadcast = (data) => {
             if (activeSessions[sessionId]) {
+                activeSessions[sessionId].events.push(data);
                 activeSessions[sessionId].clients.forEach(clientRes => {
                     clientRes.write(`data: ${JSON.stringify(data)}\n\n`);
                 });
@@ -99,6 +100,8 @@ app.get('/logs/:sessionId', (req, res) => {
     // Send an initial connected message so the client stream starts
     res.write(`data: ${JSON.stringify({ type: 'log', message: 'Connected to log stream...' })}\n\n`);
 
+    // Replay anything emitted before this client connected (fast single-file runs)
+    activeSessions[sessionId].events.forEach(evt => res.write(`data: ${JSON.stringify(evt)}\n\n`));
     activeSessions[sessionId].clients.push(res);
 
     req.on('close', () => {

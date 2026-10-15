@@ -157,6 +157,8 @@
         }
     </style>
     <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="hero.css">
+    <link rel="stylesheet" href="polish.css">
 </head>
 <body>
     <div class="app-container">
@@ -173,11 +175,70 @@
             <div class="system-status"><span class="status-dot" aria-hidden="true"></span>Conversion engine ready</div>
         </nav>
 
-        <header class="page-heading">
-            <p class="eyebrow">Creative asset pipeline</p>
-            <h1>Sticker Converter Pro</h1>
-            <p>Prepare animated stickers for every platform. Upload your archive and we’ll optimize each asset to meet platform-specific format, size, and playback requirements.</p>
+        <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+            <defs>
+                <linearGradient id="igGrad" x1="0" y1="1" x2="1" y2="0">
+                    <stop offset="0" stop-color="#feda75"/><stop offset=".35" stop-color="#fa7e1e"/>
+                    <stop offset=".6" stop-color="#d62976"/><stop offset="1" stop-color="#4f5bd5"/>
+                </linearGradient>
+            </defs>
+            <symbol id="logo-whatsapp" viewBox="0 0 24 24"><rect width="24" height="24" rx="6" fill="#25D366"/><path d="M12 4.6a7.4 7.4 0 0 0-6.3 11.2L4.7 19.4l3.7-1a7.4 7.4 0 1 0 3.6-13.8Z" fill="none" stroke="#fff" stroke-width="1.6" stroke-linejoin="round"/><path d="M9.3 8.8c.2-.4.5-.4.7-.4l.5 1.2c0 .3-.4.7-.5.9.5 1 1.3 1.7 2.3 2.2.2-.2.6-.7.9-.7l1.2.6c0 .3 0 .9-.6 1.2-.7.4-1.7.2-3-.6-1.5-.9-2.6-2.4-2.7-3.6 0-.4.1-.7.2-.8Z" fill="#fff"/></symbol>
+            <symbol id="logo-wechat" viewBox="0 0 24 24"><rect width="24" height="24" rx="6" fill="#07C160"/><ellipse cx="9.6" cy="10" rx="5" ry="4.2" fill="#fff"/><ellipse cx="15" cy="14.2" rx="4.4" ry="3.6" fill="#fff" stroke="#07C160" stroke-width="1.1"/><circle cx="8" cy="9" r=".7" fill="#07C160"/><circle cx="11.2" cy="9" r=".7" fill="#07C160"/><circle cx="13.7" cy="13.5" r=".6" fill="#07C160"/><circle cx="16.3" cy="13.5" r=".6" fill="#07C160"/></symbol>
+            <symbol id="logo-line" viewBox="0 0 24 24"><rect width="24" height="24" rx="6" fill="#06C755"/><path d="M12 5C8 5 4.8 7.6 4.8 10.8c0 2.8 2.5 5.1 5.8 5.6.3.1.5.2.5.5l-.1.9c0 .3-.2 1 .9.5s5.8-3.4 7.9-5.8c1-1.1 1.4-2.2 1.4-3.3C21.2 7.6 17.4 5 12 5Z" fill="#fff"/><path d="M8 9v3.2h1.6M11 9v3.2M12.6 12.2V9l2 3.2V9M16.8 9h-1.6v3.2h1.6M15.2 10.6h1.4" stroke="#06C755" stroke-width=".9" fill="none" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+            <symbol id="logo-telegram" viewBox="0 0 24 24"><rect width="24" height="24" rx="6" fill="#27A7E7"/><path d="m5 11.6 12.8-5c.6-.2 1.100.1.9 1l-2.200 10.400c-.2.700-.6.900-1.200.600l-3.300-2.400-1.600 1.500c-.2.200-.3.300-.7.300l.2-3.400 6.100-5.500c.3-.2-.1-.4-.4-.2l-7.500 4.700-3.200-1c-.7-.2-.7-.7.100-1Z" fill="#fff"/></symbol>
+            <symbol id="logo-instagram" viewBox="0 0 24 24"><rect width="24" height="24" rx="6" fill="url(#igGrad)"/><rect x="5.5" y="5.5" width="13" height="13" rx="4" fill="none" stroke="#fff" stroke-width="1.5"/><circle cx="12" cy="12" r="3.100" fill="none" stroke="#fff" stroke-width="1.5"/><circle cx="16" cy="8" r=".9" fill="#fff"/></symbol>
+            <symbol id="logo-giphy" viewBox="0 0 24 24"><rect width="24" height="24" rx="6" fill="#121212"/><path d="M6 5h2v14H6z" fill="#00ff99"/><path d="M16 8h2v11h-2z" fill="#9933ff"/><path d="M6 19h12v-2H6z" fill="#00ccff"/><path d="M6 5h7v2H6z" fill="#fff35c"/><path d="M13 5h3v3h-3z" fill="#ff6666"/><path d="M11 10h5v4h-5z" fill="none" stroke="#fff" stroke-width="1.6"/></symbol>
+            <symbol id="logo-signal" viewBox="0 0 24 24"><rect width="24" height="24" rx="6" fill="#3A76F0"/><path d="M12 5.2a6.800 6.800 0 0 0-5.800 10.300l-.8 3 3-.8A6.800 6.800 0 1 0 12 5.200Z" fill="#fff"/><g fill="none" stroke="#fff" stroke-width="1" stroke-dasharray="1.100 1.600" stroke-linecap="round"><circle cx="12" cy="12" r="9.400" opacity=".7"/></g></symbol>
+        </svg>
+
+        <header class="hero" id="hero">
+            <div class="hero-copy">
+                <p class="eyebrow">Creative asset pipeline</p>
+                <h1 class="hero-title" aria-label="With one GIF sticker, create every compatible version for all other platforms."><span class="w" style="--d:0" aria-hidden="true">With</span> <span class="w glow" style="--d:1" aria-hidden="true">one</span> <span class="w glow" style="--d:2" aria-hidden="true">GIF</span> <span class="w glow" style="--d:3" aria-hidden="true">sticker,</span> <span class="w" style="--d:5" aria-hidden="true">create</span> <span class="w" style="--d:6" aria-hidden="true">every</span> <span class="w" style="--d:7" aria-hidden="true">compatible</span> <span class="w" style="--d:8" aria-hidden="true">version</span> <span class="w" style="--d:9" aria-hidden="true">for</span> <span class="w" style="--d:10" aria-hidden="true">all</span> <span class="w" style="--d:11" aria-hidden="true">other</span> <span class="w" style="--d:12" aria-hidden="true">platforms.</span></h1>
+                <p class="hero-sub">Drop in a single animated GIF and we automatically resize and convert it to fit each platform's format and size limits, ready to download in seconds.</p>
+                <div class="hero-actions">
+                    <a class="hero-cta" href="#uploadHeading">Start converting <span aria-hidden="true">→</span></a>
+                    <span class="hero-meta"><b>7</b> platforms · <b>1</b> upload · <b>0</b> manual resizing</span>
+                </div>
+            </div>
+            <div class="hero-stage" aria-hidden="true">
+                <div class="scene" id="scene">
+                    <div class="floor"></div>
+                    <div class="orbit orbit-a">
+                        <div class="orb" style="--i:0"><svg><use href="#logo-whatsapp"/></svg></div>
+                        <div class="orb" style="--i:1"><svg><use href="#logo-wechat"/></svg></div>
+                        <div class="orb" style="--i:2"><svg><use href="#logo-line"/></svg></div>
+                        <div class="orb" style="--i:3"><svg><use href="#logo-telegram"/></svg></div>
+                        <div class="orb" style="--i:4"><svg><use href="#logo-instagram"/></svg></div>
+                        <div class="orb" style="--i:5"><svg><use href="#logo-giphy"/></svg></div>
+                        <div class="orb" style="--i:6"><svg><use href="#logo-signal"/></svg></div>
+                    </div>
+                    <div class="cube">
+                        <div class="face f-front"><span>GIF</span></div>
+                        <div class="face f-back"><span>APNG</span></div>
+                        <div class="face f-right"><span>WEBM</span></div>
+                        <div class="face f-left"><span>PNG</span></div>
+                        <div class="face f-top"></div>
+                        <div class="face f-bottom"></div>
+                    </div>
+                    <div class="ring ring-1"></div>
+                    <div class="ring ring-2"></div>
+                </div>
+            </div>
         </header>
+
+        <section class="platform-strip" aria-label="Supported platforms">
+            <span class="strip-label">COMPATIBLE OUTPUT</span>
+            <ul>
+                <li><svg><use href="#logo-whatsapp"/></svg>WhatsApp</li>
+                <li><svg><use href="#logo-wechat"/></svg>WeChat</li>
+                <li><svg><use href="#logo-line"/></svg>LINE</li>
+                <li><svg><use href="#logo-telegram"/></svg>Telegram</li>
+                <li><svg><use href="#logo-instagram"/></svg>Instagram</li>
+                <li><svg><use href="#logo-giphy"/></svg>GIPHY</li>
+                <li><svg><use href="#logo-signal"/></svg>Signal</li>
+            </ul>
+        </section>
 
         <main>
             <div class="workspace-grid">
@@ -185,22 +246,22 @@
                     <div class="panel-heading">
                         <div>
                             <h2 id="uploadHeading">Upload your sticker pack</h2>
-                            <p>Start with a ZIP archive of your source files.</p>
+                            <p>Start with a single GIF, or a ZIP archive of your source files.</p>
                         </div>
                         <span class="step-index" aria-label="Step 1">01</span>
                     </div>
 
                     <form id="uploadForm" enctype="multipart/form-data">
-                        <div class="drop-zone" id="dropZone" role="button" tabindex="0" aria-label="Choose or drop a ZIP archive">
+                        <div class="drop-zone" id="dropZone" role="button" tabindex="0" aria-label="Choose or drop a GIF or ZIP file">
                             <div class="drop-zone-content">
                                 <span class="upload-icon" aria-hidden="true">
                                     <svg viewBox="0 0 24 24" fill="none">
                                         <path d="M12 15V4m0 0L8 8m4-4 4 4M5 14v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
                                     </svg>
                                 </span>
-                                <h3>Drop your ZIP archive here</h3>
+                                <h3>Drop your GIF or ZIP here</h3>
                                 <p>or click to browse files on your device</p>
-                                <span class="drop-hint">ZIP archive or a single GIF / PNG</span>
+                                <span class="drop-hint">Single GIF / PNG, or a ZIP archive</span>
                                 <input type="file" name="stickerZip" id="fileInput" accept=".zip,.gif,.png" required hidden>
                             </div>
                         </div>
@@ -492,6 +553,38 @@
                 convertBtn.disabled = false;
             }
         });
+    
+        (function () {
+            if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+            const scene = document.getElementById('scene');
+            const hero = document.getElementById('hero');
+            hero.addEventListener('pointermove', (e) => {
+                const r = hero.getBoundingClientRect();
+                const x = (e.clientX - r.left) / r.width - 0.5;
+                const y = (e.clientY - r.top) / r.height - 0.5;
+                scene.style.setProperty('--ry', (x * 28) + 'deg');
+                scene.style.setProperty('--rx', (-y * 18) + 'deg');
+            });
+            hero.addEventListener('pointerleave', () => {
+                scene.style.setProperty('--ry', '0deg');
+                scene.style.setProperty('--rx', '0deg');
+            });
+            document.querySelectorAll('.panel').forEach((el) => {
+                el.addEventListener('pointermove', (e) => {
+                    const r = el.getBoundingClientRect();
+                    const x = (e.clientX - r.left) / r.width - 0.5;
+                    const y = (e.clientY - r.top) / r.height - 0.5;
+                    el.style.transform = 'perspective(1100px) rotateY(' + (x * 3) + 'deg) rotateX(' + (-y * 3) + 'deg)';
+                    el.style.setProperty('--mx', ((x + 0.5) * 100) + '%');
+                    el.style.setProperty('--my', ((y + 0.5) * 100) + '%');
+                });
+                el.addEventListener('pointerleave', () => { el.style.transform = ''; });
+            });
+            const io = new IntersectionObserver((entries) => {
+                entries.forEach((en) => { if (en.isIntersecting) { en.target.classList.add('in'); io.unobserve(en.target); } });
+            }, { threshold: 0.1 });
+            document.querySelectorAll('.panel, .platform-strip').forEach((el) => { el.classList.add('reveal'); io.observe(el); });
+        })();
     </script>
 </body>
 </html>

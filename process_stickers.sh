@@ -131,6 +131,14 @@ while IFS= read -r -d '' INPUT; do
     done
   done
 
+  # Signal (APNG): finer color ladder starting at 256, so colors are reduced last and gradually
+  APNG_CONFIGS=()
+  for c in 256 224 192 160 128 96 64 48 32 16; do
+    for (( f=ORIG_FPS; f>=HALF_FPS; f-- )); do
+      APNG_CONFIGS+=("$c:$f:0")
+    done
+  done
+
   check_and_decimate() {
     local file=$1
     local max_size=$2
@@ -147,7 +155,9 @@ while IFS= read -r -d '' INPUT; do
     echo "Size Check Failed: $file is $filesize bytes. Executing strict scaling algorithm..."
     
     local success=0
-    for CONF in "${CONFIGS[@]}"; do
+    local CONF_LIST=("${CONFIGS[@]}")
+    if [ "$format" == "apng" ]; then CONF_LIST=("${APNG_CONFIGS[@]}"); fi
+    for CONF in "${CONF_LIST[@]}"; do
       if [ "$success" -eq 1 ]; then break; fi
       
       local colors=$(echo "$CONF" | cut -d':' -f1)
@@ -165,11 +175,14 @@ while IFS= read -r -d '' INPUT; do
       else
         echo "Trying $format fallback: $colors colors at $fps FPS..."
         local comp_flag=""
+        local dither="dither=bayer:bayer_scale=5"
         if [ "$format" == "apng" ]; then
           comp_flag="-pred mixed -compression_level 9 -f apng"
+          # Dithering adds noise that PNG compresses poorly; sierra2_4a keeps smooth gradients with less noise
+          dither="dither=sierra2_4a"
         fi
         
-        ffmpeg -nostdin -y -v error -i "$INPUT" -filter_complex "[0:v]fps=${fps},scale=${base}:${base}:flags=lanczos,split[s0][s1];[s0]palettegen=max_colors=${colors}[p];[s1][p]paletteuse=dither=bayer:bayer_scale=5:diff_mode=rectangle" $comp_flag $extra "$file"
+        ffmpeg -nostdin -y -v error -i "$INPUT" -filter_complex "[0:v]fps=${fps},scale=${base}:${base}:flags=lanczos,split[s0][s1];[s0]palettegen=max_colors=${colors}:stats_mode=diff[p];[s1][p]paletteuse=${dither}:diff_mode=rectangle" $comp_flag $extra "$file"
         filesize=$(wc -c < "$file" 2>/dev/null || echo 0)
         if [ "$filesize" -le "$max_size" ]; then
            echo "Fallback Success: $file is $filesize bytes."
