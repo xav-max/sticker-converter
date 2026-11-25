@@ -273,7 +273,7 @@ optimize_webp() {
 
   # Pass 1: q=80 at full 512x512, full color, full FPS
   ffmpeg -nostdin -y -v error -i "$src" -vf "fps=${fps_max}" \
-    -c:v libwebp -lossless 0 -q:v 80 -loop 0 -preset default -an "$out"
+    -c:v libwebp_anim -lossless 0 -q:v 80 -loop 0 -preset default -an "$out"
   local fsize
   fsize=$(get_filesize "$out")
   if [ "$fsize" -gt 0 ] && [ "$fsize" -le "$max_size" ]; then
@@ -283,7 +283,7 @@ optimize_webp() {
 
   # Binary search q in [25..79] at full 512x512, full FPS
   ffmpeg -nostdin -y -v error -i "$src" -vf "fps=${fps_max}" \
-    -c:v libwebp -lossless 0 -q:v 25 -loop 0 -preset default -an "$cand_webp"
+    -c:v libwebp_anim -lossless 0 -q:v 25 -loop 0 -preset default -an "$cand_webp"
   local min_q_size
   min_q_size=$(get_filesize "$cand_webp")
   if [ "$min_q_size" -gt 0 ] && [ "$min_q_size" -le "$max_size" ]; then
@@ -293,7 +293,7 @@ optimize_webp() {
     while [ "$lo" -le "$hi" ]; do
       local mid=$(( (lo + hi) / 2 ))
       ffmpeg -nostdin -y -v error -i "$src" -vf "fps=${fps_max}" \
-        -c:v libwebp -lossless 0 -q:v "$mid" -loop 0 -preset default -an "$cand_webp"
+        -c:v libwebp_anim -lossless 0 -q:v "$mid" -loop 0 -preset default -an "$cand_webp"
       local s
       s=$(get_filesize "$cand_webp")
       if [ "$s" -gt 0 ] && [ "$s" -le "$max_size" ]; then
@@ -318,7 +318,7 @@ optimize_webp() {
     local sf
     sf=$(build_scale_filter 512 512 "$pct" 1)
     ffmpeg -nostdin -y -v error -i "$src" -vf "fps=${fps},${sf}" \
-      -c:v libwebp -lossless 0 -q:v "$q" -loop 0 -preset default -an "$out"
+      -c:v libwebp_anim -lossless 0 -q:v "$q" -loop 0 -preset default -an "$out"
     local s
     s=$(get_filesize "$out")
     if [ "$s" -gt 0 ] && [ "$s" -le "$max_size" ]; then
