@@ -18,13 +18,14 @@ const upload = multer({ dest: '/tmp/uploads/' });
 const activeSessions = {};
 const activeApngs = {};
 
-const PLATFORMS = ['whatsapp', 'wechat', 'telegram', 'signal', 'line'];
+const PLATFORMS = ['whatsapp', 'wechat', 'telegram', 'signal', 'line', 'giphy'];
 const PLATFORM_LIMITS = {
     whatsapp: 500 * 1024,
     wechat: 500 * 1024,
     telegram: 256 * 1024,
     signal: 300 * 1024,
     line: 300 * 1024,
+    giphy: 100 * 1024 * 1024,
 };
 const STATIC_SPECIALS = new Set(['tab.png', 'cover.png', 'icon.png']);
 const SESSION_TTL_MS = 30 * 60 * 1000;

@@ -9,7 +9,7 @@ OUTPUT_DIR="${2:-"/output"}"
 PROCESSED_DIR="$INPUT_DIR/processed"
 WHATSAPP_FORMAT="${WHATSAPP_FORMAT:-webp}"
 
-mkdir -p "$PROCESSED_DIR" "$OUTPUT_DIR/whatsapp" "$OUTPUT_DIR/wechat" "$OUTPUT_DIR/telegram" "$OUTPUT_DIR/signal" "$OUTPUT_DIR/line"
+mkdir -p "$PROCESSED_DIR" "$OUTPUT_DIR/whatsapp" "$OUTPUT_DIR/wechat" "$OUTPUT_DIR/telegram" "$OUTPUT_DIR/signal" "$OUTPUT_DIR/line" "$OUTPUT_DIR/giphy"
 
 BELOW_FLOOR_FILE="$OUTPUT_DIR/.below_floor"
 : > "$BELOW_FLOOR_FILE"
@@ -760,6 +760,141 @@ optimize_webm() {
   return 1
 }
 
+# Check 1st-frame transparency % against GIPHY's >=20% rule; returns percentage integer
+check_first_frame_transparency() {
+  local src="$1"
+  local work="$2"
+  local raw_f0="$work/giphy_f0.raw"
+  ffmpeg -nostdin -y -v error -i "$src" -vf "scale=512:512:flags=lanczos:force_original_aspect_ratio=decrease,pad=512:512:(ow-iw)/2:(oh-ih)/2:color=0x00000000" -frames:v 1 -f rawvideo -pix_fmt rgba "$raw_f0"
+  node -e '
+    const fs = require("fs");
+    const b = fs.readFileSync(process.argv[1]);
+    let transp = 0;
+    const total = Math.floor(b.length / 4);
+    for (let i = 3; i < b.length; i += 4) {
+      if (b[i] < 128) transp++;
+    }
+    console.log(total > 0 ? Math.round((transp * 100) / total) : 0);
+  ' "$raw_f0"
+}
+
+optimize_giphy() {
+  local src="$1"
+  local out="$2"
+  local max_size="$3"
+  local fps="$4"
+  local work="$5"
+
+  local raw_gif="$work/giphy_raw.gif"
+  ffmpeg -nostdin -y -v error -i "$src" -t 15 \
+    -filter_complex "[0:v]fps=${fps},split[s0][s1];[s0]palettegen=max_colors=256:stats_mode=full:reserve_transparent=1[p];[s1][p]paletteuse=dither=sierra2_4a:diff_mode=rectangle" \
+    -loop 0 "$raw_gif"
+
+  if [ "$HAS_GIFSICLE" -eq 1 ]; then
+    gifsicle -O3 --loopcount=0 "$raw_gif" -o "$out" 2>/dev/null || cp "$raw_gif" "$out"
+  else
+    cp "$raw_gif" "$out"
+  fi
+
+  local fsize transp_pct
+  fsize=$(get_filesize "$out")
+  transp_pct=$(check_first_frame_transparency "$src" "$work")
+
+  if [ "$fsize" -gt "$max_size" ] && [ "$HAS_GIFSICLE" -eq 1 ]; then
+    gifsicle -O3 --loopcount=0 --lossy=80 "$raw_gif" -o "$out" 2>/dev/null || true
+    fsize=$(get_filesize "$out")
+  fi
+
+  if [ "$transp_pct" -lt 20 ]; then
+    mark_below_floor "$out"
+    echo "[GIPHY] WARNING: 1st frame transparency is ${transp_pct}% (< 20% required by GIPHY). Size: $fsize bytes (256 colors, ${fps} FPS, loop=0)."
+    return 0
+  fi
+
+  if [ "$fsize" -gt "$max_size" ]; then
+    echo "[GIPHY] WARNING: Exceeded 100 MB limit ($fsize bytes)."
+    return 1
+  fi
+
+  echo "[GIPHY] Passed: $fsize bytes (256 colors, ${fps} FPS, loop=0, ${transp_pct}% transparent on 1st frame)."
+  return 0
+}
+
+# Shared static converter for both SVG (rasterized) and static PNG inputs
+process_static_sticker() {
+  local src_512="$1"
+  local orig_input="$2"
+  local is_svg="$3"
+  local is_main="$4"
+  local basename_noext="$5"
+  local work="$6"
+
+  if [ "$is_main" -eq 0 ]; then
+    if [ "$WHATSAPP_FORMAT" == "gif" ]; then
+      ffmpeg -nostdin -y -v error -i "$src_512" \
+        -vf "scale=512:512:flags=lanczos:force_original_aspect_ratio=decrease,pad=512:512:(ow-iw)/2:(oh-ih)/2:color=0x00000000,split[s0][s1];[s0]palettegen=max_colors=256:reserve_transparent=1[p];[s1][p]paletteuse" \
+        "$OUTPUT_DIR/whatsapp/${basename_noext}_whatsapp.gif"
+    else
+      ffmpeg -nostdin -y -v error -i "$src_512" \
+        -vf "scale=512:512:flags=lanczos:force_original_aspect_ratio=decrease,pad=512:512:(ow-iw)/2:(oh-ih)/2:color=0x00000000" \
+        -c:v libwebp -lossless 0 -q:v 90 "$OUTPUT_DIR/whatsapp/${basename_noext}_whatsapp.webp"
+    fi
+
+    ffmpeg -nostdin -y -v error -i "$src_512" \
+      -vf "scale=240:240:flags=lanczos:force_original_aspect_ratio=decrease,split[s0][s1];[s0]palettegen=max_colors=256:reserve_transparent=1[p];[s1][p]paletteuse" \
+      "$OUTPUT_DIR/wechat/${basename_noext}_wechat.gif"
+
+    ffmpeg -nostdin -y -v error -loop 1 -i "$src_512" -t 0.2 -r 10 \
+      -vf "scale=512:512:flags=lanczos:force_original_aspect_ratio=decrease,scale='trunc(iw/2)*2':'trunc(ih/2)*2'" \
+      -c:v libvpx-vp9 -pix_fmt yuva420p -auto-alt-ref 0 -b:v 200k -an "$OUTPUT_DIR/telegram/${basename_noext}_telegram.webm"
+
+    ffmpeg -nostdin -y -v error -i "$src_512" \
+      -vf "scale=512:512:flags=lanczos:force_original_aspect_ratio=decrease,pad=512:512:(ow-iw)/2:(oh-ih)/2:color=0x00000000" \
+      "$OUTPUT_DIR/signal/${basename_noext}_signal.png"
+    if [ "$HAS_PNGQUANT" -eq 1 ]; then
+      pngquant 256 --speed 1 --force --ext .png "$OUTPUT_DIR/signal/${basename_noext}_signal.png" >/dev/null 2>&1 || true
+    fi
+
+    # GIPHY requires >= 2 frames, loop=0 (Forever), transparent background (>= 20% 1st frame)
+    local out_giphy="$OUTPUT_DIR/giphy/${basename_noext}_giphy.gif"
+    ffmpeg -nostdin -y -v error -loop 1 -i "$src_512" -t 1 -r 2 \
+      -filter_complex "[0:v]scale=512:512:flags=lanczos:force_original_aspect_ratio=decrease,pad=512:512:(ow-iw)/2:(oh-ih)/2:color=0x00000000,split[s0][s1];[s0]palettegen=max_colors=256:reserve_transparent=1[p];[s1][p]paletteuse" \
+      -loop 0 "$work/giphy_static.gif"
+    if [ "$HAS_GIFSICLE" -eq 1 ]; then
+      gifsicle -O3 --loopcount=0 "$work/giphy_static.gif" -o "$out_giphy" 2>/dev/null || cp "$work/giphy_static.gif" "$out_giphy"
+    else
+      cp "$work/giphy_static.gif" "$out_giphy"
+    fi
+    local g_size transp_pct
+    g_size=$(get_filesize "$out_giphy")
+    transp_pct=$(check_first_frame_transparency "$src_512" "$work")
+    if [ "$transp_pct" -lt 20 ]; then
+      mark_below_floor "$out_giphy"
+      echo "[GIPHY] WARNING: 1st frame transparency is ${transp_pct}% (< 20% required by GIPHY). Size: $g_size bytes (2 frames, loop=0)."
+    else
+      echo "[GIPHY] Passed: $g_size bytes (2 frames, 256 colors, loop=0, ${transp_pct}% transparent on 1st frame)."
+    fi
+  fi
+
+  local out_line="$OUTPUT_DIR/line/${basename_noext}_line.png"
+  local lw=320 lh=270
+  if [ "$is_main" -eq 1 ]; then
+    out_line="$OUTPUT_DIR/line/main.png"
+    lw=240 lh=240
+  fi
+
+  if [ "$is_svg" -eq 1 ] && [ "$HAS_RSVG" -eq 1 ]; then
+    rsvg-convert -w "$lw" -h "$lh" -a "$orig_input" -o "$out_line"
+  else
+    ffmpeg -nostdin -y -v error -i "$src_512" \
+      -vf "scale=${lw}:${lh}:flags=lanczos:force_original_aspect_ratio=decrease,format=rgba" \
+      -frames:v 1 "$out_line"
+  fi
+  if [ "$HAS_PNGQUANT" -eq 1 ]; then
+    pngquant 256 --speed 1 --force --ext .png "$out_line" >/dev/null 2>&1 || true
+  fi
+}
+
 while IFS= read -r -d '' INPUT; do
   FULL_BASENAME=$(basename "$INPUT")
   BASENAME="${FULL_BASENAME%.*}"
@@ -817,46 +952,7 @@ while IFS= read -r -d '' INPUT; do
 
     IS_SVG_MAIN=0
     if [ "$LOWER_NAME" == "main.svg" ]; then IS_SVG_MAIN=1; fi
-
-    if [ "$IS_SVG_MAIN" -eq 0 ]; then
-      if [ "$WHATSAPP_FORMAT" == "gif" ]; then
-        ffmpeg -nostdin -y -v error -i "$SVG_WORK/svg_512.png" \
-          -vf "scale=512:512:flags=lanczos:force_original_aspect_ratio=decrease,pad=512:512:(ow-iw)/2:(oh-ih)/2:color=0x00000000,split[s0][s1];[s0]palettegen=max_colors=256:reserve_transparent=1[p];[s1][p]paletteuse" \
-          "$OUTPUT_DIR/whatsapp/${BASENAME}_whatsapp.gif"
-      else
-        ffmpeg -nostdin -y -v error -i "$SVG_WORK/svg_512.png" \
-          -vf "scale=512:512:flags=lanczos:force_original_aspect_ratio=decrease,pad=512:512:(ow-iw)/2:(oh-ih)/2:color=0x00000000" \
-          -c:v libwebp -lossless 0 -q:v 90 "$OUTPUT_DIR/whatsapp/${BASENAME}_whatsapp.webp"
-      fi
-
-      ffmpeg -nostdin -y -v error -i "$SVG_WORK/svg_512.png" \
-        -vf "scale=240:240:flags=lanczos:force_original_aspect_ratio=decrease,split[s0][s1];[s0]palettegen=max_colors=256:reserve_transparent=1[p];[s1][p]paletteuse" \
-        "$OUTPUT_DIR/wechat/${BASENAME}_wechat.gif"
-
-      ffmpeg -nostdin -y -v error -loop 1 -i "$SVG_WORK/svg_512.png" -t 0.2 -r 10 \
-        -vf "scale=512:512:flags=lanczos:force_original_aspect_ratio=decrease,scale='trunc(iw/2)*2':'trunc(ih/2)*2'" \
-        -c:v libvpx-vp9 -pix_fmt yuva420p -auto-alt-ref 0 -b:v 200k -an "$OUTPUT_DIR/telegram/${BASENAME}_telegram.webm"
-
-      ffmpeg -nostdin -y -v error -i "$SVG_WORK/svg_512.png" \
-        -vf "scale=512:512:flags=lanczos:force_original_aspect_ratio=decrease,pad=512:512:(ow-iw)/2:(oh-ih)/2:color=0x00000000" \
-        "$OUTPUT_DIR/signal/${BASENAME}_signal.png"
-      if [ "$HAS_PNGQUANT" -eq 1 ]; then
-        pngquant 256 --speed 1 --force --ext .png "$OUTPUT_DIR/signal/${BASENAME}_signal.png" >/dev/null 2>&1 || true
-      fi
-    fi
-
-    if [ "$IS_SVG_MAIN" -eq 1 ]; then
-      rsvg-convert -w 240 -h 240 -a "$INPUT" -o "$OUTPUT_DIR/line/main.png"
-    else
-      rsvg-convert -w 320 -h 270 -a "$INPUT" -o "$OUTPUT_DIR/line/${BASENAME}_line.png"
-    fi
-    if [ "$HAS_PNGQUANT" -eq 1 ]; then
-      if [ "$IS_SVG_MAIN" -eq 1 ]; then
-        pngquant 256 --speed 1 --force --ext .png "$OUTPUT_DIR/line/main.png" >/dev/null 2>&1 || true
-      else
-        pngquant 256 --speed 1 --force --ext .png "$OUTPUT_DIR/line/${BASENAME}_line.png" >/dev/null 2>&1 || true
-      fi
-    fi
+    process_static_sticker "$SVG_WORK/svg_512.png" "$INPUT" 1 "$IS_SVG_MAIN" "$BASENAME" "$SVG_WORK"
 
     rm -rf "$SVG_WORK"
     mv "$INPUT" "$PROCESSED_DIR/"
@@ -870,8 +966,14 @@ while IFS= read -r -d '' INPUT; do
   if [ "$LOWER_EXT" == "png" ]; then
     read -r APNG_FRAMES APNG_DUR APNG_FPS <<< "$(probe_apng_meta "$INPUT")"
     if [ -z "$APNG_FRAMES" ] || [ "$APNG_FRAMES" -le 1 ] 2>/dev/null; then
-      echo "Skipping static non-special PNG file: $FULL_BASENAME"
+      echo "=== Processing static PNG: $FULL_BASENAME ==="
+      PNG_WORK=$(mktemp -d)
+      IS_PNG_MAIN=0
+      if [ "$LOWER_NAME" == "main.png" ]; then IS_PNG_MAIN=1; fi
+      process_static_sticker "$INPUT" "$INPUT" 0 "$IS_PNG_MAIN" "$BASENAME" "$PNG_WORK"
+      rm -rf "$PNG_WORK"
       mv "$INPUT" "$PROCESSED_DIR/"
+      echo "Finished static PNG $BASENAME."
       continue
     fi
     echo "Detected APNG: $FULL_BASENAME (${APNG_FRAMES} frames, ${APNG_DUR}s, ~${APNG_FPS} FPS)"
@@ -889,6 +991,7 @@ while IFS= read -r -d '' INPUT; do
   MAX_WC=$((500 * 1024))
   MAX_TG=$((256 * 1024))
   MAX_SIG=$((300 * 1024))
+  MAX_GIPHY=$((100 * 1024 * 1024))
 
   if [ "$IS_MAIN" -eq 1 ]; then
     MAX_LINE=$((1000 * 1024))
@@ -908,6 +1011,7 @@ while IFS= read -r -d '' INPUT; do
   OUT_WC="$OUTPUT_DIR/wechat/${BASENAME}_wechat.gif"
   OUT_TG="$OUTPUT_DIR/telegram/${BASENAME}_telegram.webm"
   OUT_SIG="$OUTPUT_DIR/signal/${BASENAME}_signal.png"
+  OUT_GIPHY="$OUTPUT_DIR/giphy/${BASENAME}_giphy.gif"
   if [ "$IS_MAIN" -eq 1 ]; then
     OUT_LINE="$OUTPUT_DIR/line/main.png"
   else
@@ -1013,6 +1117,11 @@ while IFS= read -r -d '' INPUT; do
       optimize_apng "Signal" "$WORK_DIR/src_512_3s.mkv" "$OUT_SIG" "$MAX_SIG" 512 512 1 "$CAP_FPS" "$CAP_HALF_FPS" "3" "0" "0" "0" "0" 70 "$WORK_DIR" \
         > "$WORK_DIR/log_sig.txt" 2>&1 || touch "$WORK_DIR/fail_sig"
     ) & PIDS+=($!)
+
+    (
+      optimize_giphy "$WORK_DIR/src_512.mkv" "$OUT_GIPHY" "$MAX_GIPHY" "$ORIG_FPS" "$WORK_DIR" \
+        > "$WORK_DIR/log_giphy.txt" 2>&1 || touch "$WORK_DIR/fail_giphy"
+    ) & PIDS+=($!)
   fi
 
   (
@@ -1024,7 +1133,7 @@ while IFS= read -r -d '' INPUT; do
     wait "$pid"
   done
 
-  for logf in "$WORK_DIR/log_wa.txt" "$WORK_DIR/log_wc.txt" "$WORK_DIR/log_tg.txt" "$WORK_DIR/log_sig.txt" "$WORK_DIR/log_line.txt"; do
+  for logf in "$WORK_DIR/log_wa.txt" "$WORK_DIR/log_wc.txt" "$WORK_DIR/log_tg.txt" "$WORK_DIR/log_sig.txt" "$WORK_DIR/log_line.txt" "$WORK_DIR/log_giphy.txt"; do
     if [ -f "$logf" ]; then
       cat "$logf"
     fi

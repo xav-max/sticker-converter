@@ -473,6 +473,7 @@
             line:     { label: 'LINE',     logo: '#logo-line',     ext: '.png' },
             telegram: { label: 'Telegram', logo: '#logo-telegram', ext: '.webm' },
             signal:   { label: 'Signal',   logo: '#logo-signal',   ext: '.png' },
+            giphy:    { label: 'GIPHY',    logo: '#logo-giphy',    ext: '.gif' },
         };
         const SPECIAL_LABELS = {
             'main.gif': 'LINE main',
@@ -876,7 +877,7 @@
                     statusPill.className = `size-pill ${file.passed ? 'pass' : 'warn'}`;
                     statusPill.textContent = file.passed ? 'PASS' : 'OVER';
                     if (file.belowFloor) {
-                        statusPill.title = 'Fits under file size limit, but compressed below preferred color/FPS floor';
+                        statusPill.title = 'Fits size limit, but flagged (below quality floor or <20% GIPHY 1st-frame transparency)';
                     }
 
                     subEl.appendChild(sizeText);
