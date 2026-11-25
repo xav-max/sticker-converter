@@ -54,8 +54,8 @@ probe_apng_meta() {
       if (type === "acTL" && len >= 8) {
         frames = d.readUInt32BE(i + 8);
       } else if (type === "fcTL" && len >= 26) {
-        const num = d.readUInt16BE(i + 20);
-        const den = d.readUInt16BE(i + 22) || 100;
+        const num = d.readUInt16BE(i + 28);
+        const den = d.readUInt16BE(i + 30) || 100;
         dur += num / den;
       }
       i += 12 + len;
