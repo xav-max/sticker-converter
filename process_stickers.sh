@@ -1,18 +1,22 @@
 #!/bin/bash
 
-# Fast multi-platform sticker conversion pipeline.
+# Fast quality-preserving multi-platform sticker conversion pipeline.
 # Usage: ./process_stickers.sh [INPUT_DIR] [OUTPUT_DIR]
+# Env: WHATSAPP_FORMAT=webp|gif (default: webp)
 
 INPUT_DIR="${1:-"/input"}"
 OUTPUT_DIR="${2:-"/output"}"
 PROCESSED_DIR="$INPUT_DIR/processed"
+WHATSAPP_FORMAT="${WHATSAPP_FORMAT:-webp}"
 
 mkdir -p "$PROCESSED_DIR" "$OUTPUT_DIR/whatsapp" "$OUTPUT_DIR/wechat" "$OUTPUT_DIR/telegram" "$OUTPUT_DIR/signal" "$OUTPUT_DIR/line"
 
 HAS_GIFSICLE=0
-if command -v gifsicle >/dev/null 2>&1; then
-  HAS_GIFSICLE=1
-fi
+HAS_PNGQUANT=0
+HAS_APNGASM=0
+if command -v gifsicle >/dev/null 2>&1; then HAS_GIFSICLE=1; fi
+if command -v pngquant >/dev/null 2>&1; then HAS_PNGQUANT=1; fi
+if command -v apngasm >/dev/null 2>&1; then HAS_APNGASM=1; fi
 
 FAILED_CONVERSIONS=0
 
@@ -22,12 +26,8 @@ if [ "$FILE_COUNT" -eq 0 ]; then
   exit 0
 fi
 
-echo "Scanning $INPUT_DIR ($FILE_COUNT candidate file(s))..."
-if [ "$HAS_GIFSICLE" -eq 1 ]; then
-  echo "Fast encoders: ffmpeg + gifsicle (-O3 --lossy)"
-else
-  echo "Fast encoders: ffmpeg (gifsicle not found; using ffmpeg bisection)"
-fi
+echo "Scanning $INPUT_DIR ($FILE_COUNT candidate file(s)) | WhatsApp format: $WHATSAPP_FORMAT..."
+echo "Encoders: ffmpeg=yes gifsicle=$HAS_GIFSICLE pngquant=$HAS_PNGQUANT apngasm=$HAS_APNGASM"
 
 strip_apng_chunks() {
   local target_file="$1"
@@ -54,43 +54,103 @@ get_filesize() {
   wc -c < "$1" 2>/dev/null | tr -d ' ' || echo 0
 }
 
-# Render GIF or APNG directly from a pre-scaled lossless intermediate (.mkv)
-render_paletted() {
+# Build scale filter for a given inner percentage inside target canvas
+build_scale_filter() {
+  local canvas_w="$1"
+  local canvas_h="$2"
+  local pct="$3"
+  local pad_to_canvas="$4"
+
+  if [ "$pct" -ge 100 ]; then
+    if [ "$pad_to_canvas" -eq 1 ]; then
+      echo "scale=${canvas_w}:${canvas_h}:flags=lanczos:force_original_aspect_ratio=decrease,pad=${canvas_w}:${canvas_h}:(ow-iw)/2:(oh-ih)/2:color=0x00000000"
+    else
+      echo "scale=${canvas_w}:${canvas_h}:flags=lanczos:force_original_aspect_ratio=decrease,scale='trunc(iw/2)*2':'trunc(ih/2)*2'"
+    fi
+  else
+    local iw=$(( canvas_w * pct / 100 ))
+    local ih=$(( canvas_h * pct / 100 ))
+    iw=$(( iw - (iw % 2) ))
+    ih=$(( ih - (ih % 2) ))
+    if [ "$iw" -lt 64 ]; then iw=64; fi
+    if [ "$ih" -lt 64 ]; then ih=64; fi
+    if [ "$pad_to_canvas" -eq 1 ]; then
+      echo "scale=${iw}:${ih}:flags=lanczos:force_original_aspect_ratio=decrease,pad=${canvas_w}:${canvas_h}:(ow-iw)/2:(oh-ih)/2:color=0x00000000"
+    else
+      echo "scale=${iw}:${ih}:flags=lanczos:force_original_aspect_ratio=decrease,scale='trunc(iw/2)*2':'trunc(ih/2)*2'"
+    fi
+  fi
+}
+
+# Render GIF using stats_mode=full so static areas (hair, outfits) keep full palette colors
+render_gif_candidate() {
   local src="$1"
   local out="$2"
-  local fps="$3"
-  local colors="$4"
-  local dither="$5"
-  local format="$6"
-  local max_dur="$7"
-  local plays="$8"
+  local canvas_w="$3"
+  local canvas_h="$4"
+  local pad_canvas="$5"
+  local scale_pct="$6"
+  local fps="$7"
+  local colors="$8"
+  local dither="$9"
 
-  local vf="[0:v]fps=${fps},split[s0][s1];[s0]palettegen=max_colors=${colors}:stats_mode=diff:reserve_transparent=1[p];[s1][p]paletteuse=dither=${dither}:diff_mode=rectangle"
+  local sf
+  sf=$(build_scale_filter "$canvas_w" "$canvas_h" "$scale_pct" "$pad_canvas")
+  local vf="[0:v]fps=${fps},${sf},split[s0][s1];[s0]palettegen=max_colors=${colors}:stats_mode=full:reserve_transparent=1[p];[s1][p]paletteuse=dither=${dither}:diff_mode=rectangle"
+  ffmpeg -nostdin -y -v error -i "$src" -filter_complex "$vf" "$out"
+}
+
+# Render APNG via pngquant + apngasm when available, otherwise ffmpeg stats_mode=full
+render_apng_candidate() {
+  local src="$1"
+  local out="$2"
+  local canvas_w="$3"
+  local canvas_h="$4"
+  local pad_canvas="$5"
+  local scale_pct="$6"
+  local fps="$7"
+  local colors="$8"
+  local dither="$9"
+  local max_dur="${10}"
+  local plays="${11}"
+  local fdir="${12}"
+
+  local sf
+  sf=$(build_scale_filter "$canvas_w" "$canvas_h" "$scale_pct" "$pad_canvas")
+
   local dur_args=()
   if [ -n "$max_dur" ]; then
     dur_args=(-t "$max_dur")
   fi
 
-  if [ "$format" == "apng" ]; then
+  if [ "$HAS_PNGQUANT" -eq 1 ] && [ "$HAS_APNGASM" -eq 1 ]; then
+    rm -rf "$fdir" && mkdir -p "$fdir"
+    ffmpeg -nostdin -y -v error -i "$src" -vf "fps=${fps},${sf}" "${dur_args[@]}" "$fdir/f_%04d.png"
+    if [ "$colors" -le 256 ]; then
+      pngquant "$colors" --speed 3 --force --ext .png "$fdir"/f_*.png >/dev/null 2>&1 || true
+    fi
+    apngasm -o "$out" "$fdir"/f_*.png -d "1:${fps}" -l "${plays:-0}" -F >/dev/null 2>&1
+    strip_apng_chunks "$out"
+  else
+    local vf="[0:v]fps=${fps},${sf},split[s0][s1];[s0]palettegen=max_colors=${colors}:stats_mode=full:reserve_transparent=1[p];[s1][p]paletteuse=dither=${dither}:diff_mode=rectangle"
     ffmpeg -nostdin -y -v error -i "$src" -filter_complex "$vf" \
       -pred mixed -compression_level 9 "${dur_args[@]}" -plays "${plays:-0}" -f apng "$out"
     strip_apng_chunks "$out"
-  else
-    ffmpeg -nostdin -y -v error -i "$src" -filter_complex "$vf" "${dur_args[@]}" "$out"
   fi
 }
 
-# Build a clean monotonic quality ladder (index 0 = best quality, index N-1 = smallest)
-# Outputs lines of "colors:fps:dither"
+# Quality-preserving ladder:
+# 1. Keep full canvas & full FPS while trimming colors gently (256 -> 128)
+# 2. Trade inner artwork scale (82% -> 66% -> 52% -> 44%) while keeping >= 64 colors & full FPS!
+# 3. Only reduce FPS or drop below 64 colors as a true last resort.
 build_quality_ladder() {
   local fps_max="$1"
   local fps_min="$2"
-  local format="$3"
-  local fixed_total_min="$4"
-  local fixed_total_max="$5"
-  local dur_int="$6"
+  local fixed_total_min="$3"
+  local fixed_total_max="$4"
+  local dur_int="$5"
 
-  awk -v fmax="$fps_max" -v fmin="$fps_min" -v fmt="$format" \
+  awk -v fmax="$fps_max" -v fmin="$fps_min" \
       -v tmin="$fixed_total_min" -v tmax="$fixed_total_max" -v dint="$dur_int" '
   function clamp_fps(f,    tot) {
     if (f < fmin) f = fmin;
@@ -104,29 +164,28 @@ build_quality_ladder() {
     return f;
   }
   BEGIN {
-    # 15 steps ordered from highest quality to smallest size.
-    # Colors drop smoothly first; FPS drops in clean fractions only in the lower half.
-    c[0]=256; fr[0]=1.00; d[0]="sierra2_4a";
-    c[1]=192; fr[1]=1.00; d[1]="sierra2_4a";
-    c[2]=128; fr[2]=1.00; d[2]="sierra2_4a";
-    c[3]=96;  fr[3]=1.00; d[3]="sierra2_4a";
-    c[4]=64;  fr[4]=1.00; d[4]="sierra2_4a";
-    c[5]=64;  fr[5]=1.00; d[5]="none";
-    c[6]=48;  fr[6]=1.00; d[6]="none";
-    c[7]=32;  fr[7]=1.00; d[7]="none";
-    c[8]=32;  fr[8]=0.80; d[8]="none";
-    c[9]=24;  fr[9]=0.70; d[9]="none";
-    c[10]=24; fr[10]=0.55; d[10]="none";
-    c[11]=16; fr[11]=0.55; d[11]="none";
-    c[12]=16; fr[12]=0.50; d[12]="none";
-    c[13]=8;  fr[13]=0.50; d[13]="none";
-    c[14]=4;  fr[14]=0.50; d[14]="none";
+    # scale_pct : colors : fps_ratio : dither
+    sc[0]=100; c[0]=256; fr[0]=1.00; d[0]="sierra2_4a";
+    sc[1]=100; c[1]=128; fr[1]=1.00; d[1]="sierra2_4a";
+    sc[2]=82;  c[2]=192; fr[2]=1.00; d[2]="sierra2_4a";
+    sc[3]=82;  c[3]=128; fr[3]=1.00; d[3]="sierra2_4a";
+    sc[4]=66;  c[4]=128; fr[4]=1.00; d[4]="sierra2_4a";
+    sc[5]=66;  c[5]=96;  fr[5]=1.00; d[5]="sierra2_4a";
+    sc[6]=52;  c[6]=128; fr[6]=1.00; d[6]="sierra2_4a";
+    sc[7]=52;  c[7]=64;  fr[7]=1.00; d[7]="sierra2_4a";
+    sc[8]=44;  c[8]=64;  fr[8]=1.00; d[8]="none";
+    sc[9]=50;  c[9]=64;  fr[9]=0.75; d[9]="none";
+    sc[10]=44; c[10]=48; fr[10]=0.75; d[10]="none";
+    sc[11]=44; c[11]=48; fr[11]=0.65; d[11]="none";
+    sc[12]=40; c[12]=32; fr[12]=0.60; d[12]="none";
+    sc[13]=36; c[13]=24; fr[13]=0.50; d[13]="none";
+    sc[14]=36; c[14]=16; fr[14]=0.50; d[14]="none";
 
     prev = "";
     for (i = 0; i < 15; i++) {
       fps = int(fmax * fr[i] + 0.5);
       fps = clamp_fps(fps);
-      entry = c[i] ":" fps ":" d[i];
+      entry = sc[i] ":" c[i] ":" fps ":" d[i];
       if (entry != prev) {
         print entry;
         prev = entry;
@@ -135,7 +194,7 @@ build_quality_ladder() {
   }'
 }
 
-optimize_gif() {
+optimize_webp() {
   local label="$1"
   local src="$2"
   local out="$3"
@@ -144,12 +203,87 @@ optimize_gif() {
   local fps_min="$6"
   local work="$7"
 
+  local best_webp="$work/${label}_best.webp"
+  local cand_webp="$work/${label}_cand.webp"
+
+  # Pass 1: q=80 at full 512x512, full color, full FPS
+  ffmpeg -nostdin -y -v error -i "$src" -vf "fps=${fps_max}" \
+    -c:v libwebp -lossless 0 -q:v 80 -loop 0 -preset default -an "$out"
+  local fsize
+  fsize=$(get_filesize "$out")
+  if [ "$fsize" -gt 0 ] && [ "$fsize" -le "$max_size" ]; then
+    echo "[$label] Passed on 1st pass (WebP q=80, 512x512, full color, ${fps_max} FPS): $fsize / $max_size bytes."
+    return 0
+  fi
+
+  # Binary search q in [25..79] at full 512x512, full FPS
+  ffmpeg -nostdin -y -v error -i "$src" -vf "fps=${fps_max}" \
+    -c:v libwebp -lossless 0 -q:v 25 -loop 0 -preset default -an "$cand_webp"
+  local min_q_size
+  min_q_size=$(get_filesize "$cand_webp")
+  if [ "$min_q_size" -gt 0 ] && [ "$min_q_size" -le "$max_size" ]; then
+    cp "$cand_webp" "$best_webp"
+    local best_q=25 best_size="$min_q_size"
+    local lo=26 hi=79
+    while [ "$lo" -le "$hi" ]; do
+      local mid=$(( (lo + hi) / 2 ))
+      ffmpeg -nostdin -y -v error -i "$src" -vf "fps=${fps_max}" \
+        -c:v libwebp -lossless 0 -q:v "$mid" -loop 0 -preset default -an "$cand_webp"
+      local s
+      s=$(get_filesize "$cand_webp")
+      if [ "$s" -gt 0 ] && [ "$s" -le "$max_size" ]; then
+        cp "$cand_webp" "$best_webp"
+        best_q="$mid"
+        best_size="$s"
+        lo=$((mid + 1))
+      else
+        hi=$((mid - 1))
+      fi
+    done
+    cp "$best_webp" "$out"
+    echo "[$label] Passed via WebP bisection (q=$best_q, 512x512, full color, ${fps_max} FPS): $best_size / $max_size bytes."
+    return 0
+  fi
+
+  # Fallback: step inner scale / FPS with q=50
+  local fallbacks=("75:${fps_max}:55" "60:${fps_max}:50" "55:${fps_min}:45" "45:${fps_min}:35")
+  for cfg in "${fallbacks[@]}"; do
+    local pct fps q
+    IFS=':' read -r pct fps q <<< "$cfg"
+    local sf
+    sf=$(build_scale_filter 512 512 "$pct" 1)
+    ffmpeg -nostdin -y -v error -i "$src" -vf "fps=${fps},${sf}" \
+      -c:v libwebp -lossless 0 -q:v "$q" -loop 0 -preset default -an "$out"
+    local s
+    s=$(get_filesize "$out")
+    if [ "$s" -gt 0 ] && [ "$s" -le "$max_size" ]; then
+      echo "[$label] Passed via WebP fallback (scale=${pct}%, ${fps} FPS, q=${q}): $s / $max_size bytes."
+      return 0
+    fi
+  done
+
+  echo "[$label] WARNING: Could not shrink WebP below $max_size bytes."
+  return 1
+}
+
+optimize_gif() {
+  local label="$1"
+  local src="$2"
+  local out="$3"
+  local max_size="$4"
+  local canvas_w="$5"
+  local canvas_h="$6"
+  local pad_canvas="$7"
+  local fps_max="$8"
+  local fps_min="$9"
+  local work="${10}"
+
   local raw_gif="$work/${label}_raw.gif"
   local best_gif="$work/${label}_best.gif"
   local cand_gif="$work/${label}_cand.gif"
 
-  # Pass 1: 256 colors at full FPS
-  render_paletted "$src" "$raw_gif" "$fps_max" 256 "sierra2_4a" "gif" "" ""
+  # Pass 1: Full canvas, 256 colors, full FPS
+  render_gif_candidate "$src" "$raw_gif" "$canvas_w" "$canvas_h" "$pad_canvas" 100 "$fps_max" 256 "sierra2_4a"
   if [ "$HAS_GIFSICLE" -eq 1 ]; then
     gifsicle -O3 "$raw_gif" -o "$out" 2>/dev/null || cp "$raw_gif" "$out"
   else
@@ -163,15 +297,14 @@ optimize_gif() {
     return 0
   fi
 
-  # Stage A (fast): If gifsicle is available, binary-search --lossy (10..140) on 256-color GIF
+  # Stage A: Try gifsicle --lossy bisection (10..140) on 256-color full-size GIF
   if [ "$HAS_GIFSICLE" -eq 1 ]; then
     gifsicle -O3 --lossy=140 "$raw_gif" -o "$cand_gif" 2>/dev/null
     local max_lossy_size
     max_lossy_size=$(get_filesize "$cand_gif")
     if [ "$max_lossy_size" -gt 0 ] && [ "$max_lossy_size" -le "$max_size" ]; then
       cp "$cand_gif" "$best_gif"
-      local best_lossy=140
-      local best_size="$max_lossy_size"
+      local best_lossy=140 best_size="$max_lossy_size"
       local lo=10 hi=139
       while [ "$lo" -le "$hi" ]; do
         local mid=$(( (lo + hi) / 2 ))
@@ -193,11 +326,11 @@ optimize_gif() {
     fi
   fi
 
-  # Stage B: Binary search unified (colors, fps, dither) ladder
+  # Stage B: Quality-preserving bisection (scale padding + >=64 colors + full FPS before extreme cuts)
   local ladder=()
   while IFS= read -r line; do
     ladder+=("$line")
-  done < <(build_quality_ladder "$fps_max" "$fps_min" "gif" 0 0 0)
+  done < <(build_quality_ladder "$fps_max" "$fps_min" 0 0 0)
 
   local lo=1
   local hi=$(( ${#ladder[@]} - 1 ))
@@ -208,10 +341,10 @@ optimize_gif() {
   while [ "$lo" -le "$hi" ]; do
     local mid=$(( (lo + hi) / 2 ))
     local conf="${ladder[$mid]}"
-    local c f d
-    IFS=':' read -r c f d <<< "$conf"
+    local pct c f d
+    IFS=':' read -r pct c f d <<< "$conf"
 
-    render_paletted "$src" "$raw_gif" "$f" "$c" "$d" "gif" "" ""
+    render_gif_candidate "$src" "$raw_gif" "$canvas_w" "$canvas_h" "$pad_canvas" "$pct" "$f" "$c" "$d"
     if [ "$HAS_GIFSICLE" -eq 1 ]; then
       gifsicle -O3 --lossy=80 "$raw_gif" -o "$cand_gif" 2>/dev/null || cp "$raw_gif" "$cand_gif"
     else
@@ -233,11 +366,10 @@ optimize_gif() {
 
   if [ "$found" -eq 1 ]; then
     cp "$best_gif" "$out"
-    echo "[$label] Passed via bisection ($best_conf): $best_size / $max_size bytes."
+    echo "[$label] Passed via bisection (scale%=$best_conf): $best_size / $max_size bytes."
     return 0
   fi
 
-  # Keep smallest attempt
   cp "$cand_gif" "$out" 2>/dev/null || true
   local final_s
   final_s=$(get_filesize "$out")
@@ -250,27 +382,31 @@ optimize_apng() {
   local src="$2"
   local out="$3"
   local max_size="$4"
-  local fps_max="$5"
-  local fps_min="$6"
-  local max_dur="$7"
-  local plays="$8"
-  local tmin="$9"
-  local tmax="${10}"
-  local dur_int="${11}"
-  local work="${12}"
+  local canvas_w="$5"
+  local canvas_h="$6"
+  local pad_canvas="$7"
+  local fps_max="$8"
+  local fps_min="$9"
+  local max_dur="${10}"
+  local plays="${11}"
+  local tmin="${12}"
+  local tmax="${13}"
+  local dur_int="${14}"
+  local work="${15}"
 
   local best_png="$work/${label}_best.png"
   local cand_png="$work/${label}_cand.png"
+  local fdir="$work/${label}_frames"
 
   local ladder=()
   while IFS= read -r line; do
     ladder+=("$line")
-  done < <(build_quality_ladder "$fps_max" "$fps_min" "apng" "$tmin" "$tmax" "$dur_int")
+  done < <(build_quality_ladder "$fps_max" "$fps_min" "$tmin" "$tmax" "$dur_int")
 
-  # Pass 1: highest quality entry (index 0)
-  local c0 f0 d0
-  IFS=':' read -r c0 f0 d0 <<< "${ladder[0]}"
-  render_paletted "$src" "$out" "$f0" "$c0" "$d0" "apng" "$max_dur" "$plays"
+  # Pass 1: Full canvas, 256 colors, full FPS
+  local pct0 c0 f0 d0
+  IFS=':' read -r pct0 c0 f0 d0 <<< "${ladder[0]}"
+  render_apng_candidate "$src" "$out" "$canvas_w" "$canvas_h" "$pad_canvas" "$pct0" "$f0" "$c0" "$d0" "$max_dur" "$plays" "$fdir"
   local fsize
   fsize=$(get_filesize "$out")
   if [ "$fsize" -le "$max_size" ]; then
@@ -278,7 +414,7 @@ optimize_apng() {
     return 0
   fi
 
-  # Binary search over remaining ladder entries
+  # Binary search over quality-preserving ladder
   local lo=1
   local hi=$(( ${#ladder[@]} - 1 ))
   local found=0
@@ -288,10 +424,10 @@ optimize_apng() {
   while [ "$lo" -le "$hi" ]; do
     local mid=$(( (lo + hi) / 2 ))
     local conf="${ladder[$mid]}"
-    local c f d
-    IFS=':' read -r c f d <<< "$conf"
+    local pct c f d
+    IFS=':' read -r pct c f d <<< "$conf"
 
-    render_paletted "$src" "$cand_png" "$f" "$c" "$d" "apng" "$max_dur" "$plays"
+    render_apng_candidate "$src" "$cand_png" "$canvas_w" "$canvas_h" "$pad_canvas" "$pct" "$f" "$c" "$d" "$max_dur" "$plays" "$fdir"
     local s
     s=$(get_filesize "$cand_png")
     if [ "$s" -gt 0 ] && [ "$s" -le "$max_size" ]; then
@@ -307,7 +443,7 @@ optimize_apng() {
 
   if [ "$found" -eq 1 ]; then
     cp "$best_png" "$out"
-    echo "[$label] Passed via bisection ($best_conf): $best_size / $max_size bytes."
+    echo "[$label] Passed via bisection (scale%=$best_conf): $best_size / $max_size bytes."
     return 0
   fi
 
@@ -331,7 +467,6 @@ optimize_webm() {
   local eff_dur
   eff_dur=$(awk -v d="$dur" 'BEGIN { if (d <= 0.2) d = 0.2; if (d > 3.0) d = 3.0; printf "%.3f", d }')
 
-  # Target ~228 KB payload to leave margin for WebM muxing overhead under 256 KB
   local base_kbps
   base_kbps=$(awk -v d="$eff_dur" 'BEGIN {
     k = int((228 * 1024 * 8) / (d * 1000));
@@ -353,7 +488,7 @@ optimize_webm() {
     local kbps fps
     IFS=':' read -r kbps fps <<< "$cfg"
     if [ "$kbps" -lt 60 ]; then kbps=60; fi
-    if [ "$fps" -lt 5 ]; then fps=5; fi
+    if [ "$fps" -lt 4 ]; then fps=4; fi
 
     rm -f "${passlog}"*
     ffmpeg -nostdin -y -v error -i "$src" -vf "fps=${fps}" \
@@ -432,13 +567,19 @@ while IFS= read -r -d '' INPUT; do
 
   if [ "$IS_MAIN" -eq 1 ]; then
     MAX_LINE=$((1000 * 1024))
-    LINE_SCALE="240:240"
+    LINE_W=240
+    LINE_H=240
   else
     MAX_LINE=$((300 * 1024))
-    LINE_SCALE="320:270"
+    LINE_W=320
+    LINE_H=270
   fi
 
-  OUT_WA="$OUTPUT_DIR/whatsapp/${BASENAME}_whatsapp.gif"
+  if [ "$WHATSAPP_FORMAT" == "gif" ]; then
+    OUT_WA="$OUTPUT_DIR/whatsapp/${BASENAME}_whatsapp.gif"
+  else
+    OUT_WA="$OUTPUT_DIR/whatsapp/${BASENAME}_whatsapp.webp"
+  fi
   OUT_WC="$OUTPUT_DIR/wechat/${BASENAME}_wechat.gif"
   OUT_TG="$OUTPUT_DIR/telegram/${BASENAME}_telegram.webm"
   OUT_SIG="$OUTPUT_DIR/signal/${BASENAME}_signal.png"
@@ -448,7 +589,6 @@ while IFS= read -r -d '' INPUT; do
     OUT_LINE="$OUTPUT_DIR/line/${BASENAME}_line.png"
   fi
 
-  # Probe duration and FPS once
   DUR=$(ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "$INPUT" 2>/dev/null)
   if [ -z "$DUR" ] || [ "$DUR" == "N/A" ]; then DUR="2.0"; fi
 
@@ -462,7 +602,7 @@ while IFS= read -r -d '' INPUT; do
     } else {
       f = 15;
     }
-    if (f < 5) f = 5;
+    if (f < 4) f = 4;
     if (f > 60) f = 60;
     print f;
   }')
@@ -471,9 +611,9 @@ while IFS= read -r -d '' INPUT; do
   if [ "$CAP_FPS" -gt 30 ]; then CAP_FPS=30; fi
 
   HALF_FPS=$((ORIG_FPS / 2))
-  if [ "$HALF_FPS" -lt 5 ]; then HALF_FPS=5; fi
+  if [ "$HALF_FPS" -lt 4 ]; then HALF_FPS=4; fi
   CAP_HALF_FPS=$((CAP_FPS / 2))
-  if [ "$CAP_HALF_FPS" -lt 5 ]; then CAP_HALF_FPS=5; fi
+  if [ "$CAP_HALF_FPS" -lt 4 ]; then CAP_HALF_FPS=4; fi
 
   LINE_DUR=$(awk -v d="$DUR" 'BEGIN {
     r = int(d + 0.5);
@@ -496,7 +636,6 @@ while IFS= read -r -d '' INPUT; do
   WORK_DIR=$(mktemp -d)
   echo "Normalizing source once (${ORIG_FPS} FPS, ${DUR}s)..."
 
-  # Decode & pre-scale ONCE per target resolution
   if [ "$IS_MAIN" -eq 0 ]; then
     ffmpeg -nostdin -y -v error -i "$INPUT" \
       -vf "fps=${ORIG_FPS},scale=512:512:flags=lanczos:force_original_aspect_ratio=decrease,pad=512:512:(ow-iw)/2:(oh-ih)/2:color=0x00000000" \
@@ -512,20 +651,26 @@ while IFS= read -r -d '' INPUT; do
   fi
 
   ffmpeg -nostdin -y -v error -i "$INPUT" \
-    -vf "${LINE_SETPTS},fps=${LINE_FPS},scale=${LINE_SCALE}:flags=lanczos:force_original_aspect_ratio=decrease,scale='trunc(iw/2)*2':'trunc(ih/2)*2'" \
+    -vf "${LINE_SETPTS},fps=${LINE_FPS},scale=${LINE_W}:${LINE_H}:flags=lanczos:force_original_aspect_ratio=decrease,scale='trunc(iw/2)*2':'trunc(ih/2)*2'" \
     -t "$LINE_DUR" -c:v utvideo -pix_fmt rgba "$WORK_DIR/src_line.mkv"
 
-  # Run platform conversions in parallel
   PIDS=()
 
   if [ "$IS_MAIN" -eq 0 ]; then
-    (
-      optimize_gif "WhatsApp" "$WORK_DIR/src_512.mkv" "$OUT_WA" "$MAX_WA" "$ORIG_FPS" "$HALF_FPS" "$WORK_DIR" \
-        > "$WORK_DIR/log_wa.txt" 2>&1 || touch "$WORK_DIR/fail_wa"
-    ) & PIDS+=($!)
+    if [ "$WHATSAPP_FORMAT" == "gif" ]; then
+      (
+        optimize_gif "WhatsApp" "$WORK_DIR/src_512.mkv" "$OUT_WA" "$MAX_WA" 512 512 1 "$ORIG_FPS" "$HALF_FPS" "$WORK_DIR" \
+          > "$WORK_DIR/log_wa.txt" 2>&1 || touch "$WORK_DIR/fail_wa"
+      ) & PIDS+=($!)
+    else
+      (
+        optimize_webp "WhatsApp" "$WORK_DIR/src_512.mkv" "$OUT_WA" "$MAX_WA" "$ORIG_FPS" "$HALF_FPS" "$WORK_DIR" \
+          > "$WORK_DIR/log_wa.txt" 2>&1 || touch "$WORK_DIR/fail_wa"
+      ) & PIDS+=($!)
+    fi
 
     (
-      optimize_gif "WeChat" "$WORK_DIR/src_240.mkv" "$OUT_WC" "$MAX_WC" "$ORIG_FPS" "$HALF_FPS" "$WORK_DIR" \
+      optimize_gif "WeChat" "$WORK_DIR/src_240.mkv" "$OUT_WC" "$MAX_WC" 240 240 0 "$ORIG_FPS" "$HALF_FPS" "$WORK_DIR" \
         > "$WORK_DIR/log_wc.txt" 2>&1 || touch "$WORK_DIR/fail_wc"
     ) & PIDS+=($!)
 
@@ -535,13 +680,13 @@ while IFS= read -r -d '' INPUT; do
     ) & PIDS+=($!)
 
     (
-      optimize_apng "Signal" "$WORK_DIR/src_512_3s.mkv" "$OUT_SIG" "$MAX_SIG" "$CAP_FPS" "$CAP_HALF_FPS" "3" "0" "0" "0" "0" "$WORK_DIR" \
+      optimize_apng "Signal" "$WORK_DIR/src_512_3s.mkv" "$OUT_SIG" "$MAX_SIG" 512 512 1 "$CAP_FPS" "$CAP_HALF_FPS" "3" "0" "0" "0" "0" "$WORK_DIR" \
         > "$WORK_DIR/log_sig.txt" 2>&1 || touch "$WORK_DIR/fail_sig"
     ) & PIDS+=($!)
   fi
 
   (
-    optimize_apng "LINE" "$WORK_DIR/src_line.mkv" "$OUT_LINE" "$MAX_LINE" "$LINE_FPS" "1" "$LINE_DUR" "$LINE_PLAYS" "5" "20" "$LINE_DUR" "$WORK_DIR" \
+    optimize_apng "LINE" "$WORK_DIR/src_line.mkv" "$OUT_LINE" "$MAX_LINE" "$LINE_W" "$LINE_H" 0 "$LINE_FPS" "1" "$LINE_DUR" "$LINE_PLAYS" "5" "20" "$LINE_DUR" "$WORK_DIR" \
       > "$WORK_DIR/log_line.txt" 2>&1 || touch "$WORK_DIR/fail_line"
   ) & PIDS+=($!)
 

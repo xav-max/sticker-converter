@@ -123,6 +123,14 @@
                             <div class="sticker-grid" id="stagingGrid"></div>
                         </div>
 
+                        <div class="wa-format-bar">
+                            <span class="wa-format-label">WhatsApp output format</span>
+                            <div class="wa-format-options" role="group" aria-label="WhatsApp output format">
+                                <button type="button" class="wa-opt-btn active" data-wa-fmt="webp">WebP (Full color · Recommended)</button>
+                                <button type="button" class="wa-opt-btn" data-wa-fmt="gif">GIF</button>
+                            </div>
+                        </div>
+
                         <button type="submit" id="convertBtn" class="convert-btn" disabled>
                             <span class="btn-text">Convert Stickers</span>
                             <div class="spinner" id="spinner" style="display: none;"></div>
@@ -131,6 +139,7 @@
 
                     <div class="format-row" aria-label="Supported output formats">
                         <span class="format-label">OUTPUT FORMATS</span>
+                        <span class="format-chip">WEBP</span>
                         <span class="format-chip">GIF</span>
                         <span class="format-chip">APNG</span>
                         <span class="format-chip">WEBM</span>
@@ -156,7 +165,7 @@
                         <div class="platform-specs-content">
                             <h5>WhatsApp</h5>
                             <ul>
-                                <li><strong>Format:</strong> GIF</li>
+                                <li><strong>Format:</strong> Animated WebP (recommended, full color) or GIF</li>
                                 <li><strong>Size:</strong> 512x512 pixels, ≤ 500 KB</li>
                                 <li><strong>Framerate & Duration:</strong> Original FPS, dynamic fit</li>
                             </ul>
@@ -204,6 +213,7 @@
                 </div>
 
                 <div class="download-bar" id="downloadBar"></div>
+                <p class="alpha-note" id="alphaNote" style="display: none;">Note: Telegram .webm preserves full alpha transparency (Safari previews WebM video over white, while Telegram &amp; Chrome render it transparent).</p>
                 <div class="platform-tabs" id="platformTabs"></div>
                 <div class="results-grid" id="resultsGrid"></div>
             </section>
@@ -264,6 +274,16 @@
         let currentSessionId = null;
         let currentManifest = null;
         let activeTab = 'all';
+        let selectedWaFormat = 'webp';
+
+        document.querySelectorAll('.wa-opt-btn').forEach((btn) => {
+            btn.addEventListener('click', () => {
+                selectedWaFormat = btn.dataset.waFmt || 'webp';
+                document.querySelectorAll('.wa-opt-btn').forEach((b) => {
+                    b.classList.toggle('active', b === btn);
+                });
+            });
+        });
 
         function formatBytes(bytes) {
             if (bytes < 1024) return `${bytes} B`;
@@ -507,12 +527,18 @@
             activePlatforms.forEach((p) => {
                 const meta = PLATFORM_META[p];
                 const list = manifest[p];
+                const extDisplay = p === 'whatsapp' && list[0]?.ext ? list[0].ext : meta.ext;
                 const btn = document.createElement('a');
                 btn.className = 'dl-btn';
                 btn.href = `/download/${sessionId}/platform/${p}`;
-                btn.innerHTML = `<svg><use href="${meta.logo}"/></svg><span>${meta.label}</span><span class="dl-btn-meta">${list.length} · ${meta.ext}</span>`;
+                btn.innerHTML = `<svg><use href="${meta.logo}"/></svg><span>${meta.label}</span><span class="dl-btn-meta">${list.length} · ${extDisplay}</span>`;
                 downloadBar.appendChild(btn);
             });
+
+            const alphaNote = document.getElementById('alphaNote');
+            if (alphaNote) {
+                alphaNote.style.display = activePlatforms.includes('telegram') ? 'block' : 'none';
+            }
 
             // Render Platform Filter Tabs
             platformTabs.innerHTML = '';
@@ -653,6 +679,7 @@
             appendLog(`NEW BATCH: Uploading ${queuedItems.length} file(s) to fast pipeline...`);
 
             const formData = new FormData();
+            formData.append('whatsappFormat', selectedWaFormat);
             queuedItems.forEach((item) => {
                 formData.append('stickers', item.file);
             });

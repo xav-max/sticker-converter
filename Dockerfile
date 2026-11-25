@@ -1,26 +1,37 @@
-# Use a lightweight Alpine Linux base image
+# Stage 1: Build apngasm (with Zopfli compression)
+FROM alpine:latest AS apngasm-builder
+RUN apk add --no-cache \
+    build-base cmake git libpng-dev zlib-dev zopfli-dev boost-dev
+RUN git clone --depth 1 --recursive https://github.com/apngasm/apngasm.git /usr/src/apngasm
+WORKDIR /usr/src/apngasm/build
+RUN cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr/local .. \
+    && make -j$(nproc) apngasm-dynamic \
+    && make -j$(nproc) apngasm-cli \
+    && make install
+
+# Stage 2: Runtime container
 FROM alpine:latest
 
-# Install FFmpeg, Bash, Node.js, NPM, Gifsicle, and pngquant
-RUN apk add --no-cache bash ffmpeg coreutils nodejs npm gifsicle pngquant
+# Install FFmpeg, Bash, Node.js, NPM, Gifsicle, pngquant, and apngasm runtime libs
+RUN apk add --no-cache \
+    bash ffmpeg coreutils nodejs npm gifsicle pngquant \
+    libpng zopfli libstdc++ \
+    boost-filesystem boost-program_options boost-regex
 
-# Set the working directory inside the container
+COPY --from=apngasm-builder /usr/local/bin/apngasm /usr/local/bin/apngasm
+COPY --from=apngasm-builder /usr/local/lib/libapngasm* /usr/local/lib/
+
 WORKDIR /app
 
-# Copy your bash script into the container and make it executable
 COPY process_stickers.sh .
 RUN chmod +x process_stickers.sh
 
-# Copy over the Node.js server files
 COPY package.json .
 COPY server.js .
 COPY public/ public/
 
-# Install Node modules
 RUN npm install
 
-# Expose the web server port
 EXPOSE 8080
 
-# Run the web server when the container starts instead of the bash script directly
 CMD ["node", "server.js"]

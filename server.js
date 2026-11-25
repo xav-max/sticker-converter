@@ -138,8 +138,11 @@ app.post('/upload', upload.any(), async (req, res) => {
             fs.unlinkSync(file.path);
         }
 
+        const whatsappFormat = req.body && req.body.whatsappFormat === 'gif' ? 'gif' : 'webp';
         const scriptPath = path.join(__dirname, 'process_stickers.sh');
-        const processStickers = spawn('bash', [scriptPath, extractDir, outputDir]);
+        const processStickers = spawn('bash', [scriptPath, extractDir, outputDir], {
+            env: { ...process.env, WHATSAPP_FORMAT: whatsappFormat },
+        });
 
         const broadcast = (data) => {
             const session = activeSessions[sessionId];
@@ -240,6 +243,7 @@ app.get('/preview/:sessionId/:platform/:filename', (req, res) => {
     const ext = path.extname(safeFile).toLowerCase();
     const mime =
         ext === '.gif' ? 'image/gif' :
+        ext === '.webp' ? 'image/webp' :
         ext === '.png' ? 'image/png' :
         ext === '.webm' ? 'video/webm' : 'application/octet-stream';
     res.setHeader('Content-Type', mime);
