@@ -830,14 +830,15 @@ process_static_sticker() {
   local work="$6"
 
   if [ "$is_main" -eq 0 ]; then
-    if [ "$WHATSAPP_FORMAT" == "gif" ]; then
-      ffmpeg -nostdin -y -v error -i "$src_512" \
-        -vf "scale=512:512:flags=lanczos:force_original_aspect_ratio=decrease,pad=512:512:(ow-iw)/2:(oh-ih)/2:color=0x00000000,split[s0][s1];[s0]palettegen=max_colors=256:reserve_transparent=1[p];[s1][p]paletteuse" \
-        "$OUTPUT_DIR/whatsapp/${basename_noext}_whatsapp.gif"
-    else
+    if [[ "$WHATSAPP_FORMAT" == "webp" || "$WHATSAPP_FORMAT" == "both" ]]; then
       ffmpeg -nostdin -y -v error -i "$src_512" \
         -vf "scale=512:512:flags=lanczos:force_original_aspect_ratio=decrease,pad=512:512:(ow-iw)/2:(oh-ih)/2:color=0x00000000" \
         -c:v libwebp -lossless 0 -q:v 90 "$OUTPUT_DIR/whatsapp/${basename_noext}_whatsapp.webp"
+    fi
+    if [[ "$WHATSAPP_FORMAT" == "gif" || "$WHATSAPP_FORMAT" == "both" ]]; then
+      ffmpeg -nostdin -y -v error -i "$src_512" \
+        -vf "scale=512:512:flags=lanczos:force_original_aspect_ratio=decrease,pad=512:512:(ow-iw)/2:(oh-ih)/2:color=0x00000000,split[s0][s1];[s0]palettegen=max_colors=256:reserve_transparent=1[p];[s1][p]paletteuse" \
+        "$OUTPUT_DIR/whatsapp/${basename_noext}_whatsapp.gif"
     fi
 
     ffmpeg -nostdin -y -v error -i "$src_512" \
@@ -1006,11 +1007,8 @@ while IFS= read -r -d '' INPUT; do
     LINE_H=270
   fi
 
-  if [ "$WHATSAPP_FORMAT" == "gif" ]; then
-    OUT_WA="$OUTPUT_DIR/whatsapp/${BASENAME}_whatsapp.gif"
-  else
-    OUT_WA="$OUTPUT_DIR/whatsapp/${BASENAME}_whatsapp.webp"
-  fi
+  OUT_WA_GIF="$OUTPUT_DIR/whatsapp/${BASENAME}_whatsapp.gif"
+  OUT_WA_WEBP="$OUTPUT_DIR/whatsapp/${BASENAME}_whatsapp.webp"
   OUT_WC="$OUTPUT_DIR/wechat/${BASENAME}_wechat.gif"
   OUT_TG="$OUTPUT_DIR/telegram/${BASENAME}_telegram.webm"
   OUT_SIG="$OUTPUT_DIR/signal/${BASENAME}_signal.png"
@@ -1094,15 +1092,16 @@ while IFS= read -r -d '' INPUT; do
   PIDS=()
 
   if [ "$IS_MAIN" -eq 0 ]; then
-    if [ "$WHATSAPP_FORMAT" == "gif" ]; then
+    if [[ "$WHATSAPP_FORMAT" == "webp" || "$WHATSAPP_FORMAT" == "both" ]]; then
       (
-        optimize_gif "WhatsApp" "$WORK_DIR/src_512.mkv" "$OUT_WA" "$MAX_WA" 512 512 1 "$ORIG_FPS" "$HALF_FPS" 85 "$WORK_DIR" \
-          > "$WORK_DIR/log_wa.txt" 2>&1 || touch "$WORK_DIR/fail_wa"
+        optimize_webp "WhatsApp-WebP" "$WORK_DIR/src_512.mkv" "$OUT_WA_WEBP" "$MAX_WA" "$ORIG_FPS" "$HALF_FPS" "$WORK_DIR" \
+          > "$WORK_DIR/log_wa_webp.txt" 2>&1 || touch "$WORK_DIR/fail_wa_webp"
       ) & PIDS+=($!)
-    else
+    fi
+    if [[ "$WHATSAPP_FORMAT" == "gif" || "$WHATSAPP_FORMAT" == "both" ]]; then
       (
-        optimize_webp "WhatsApp" "$WORK_DIR/src_512.mkv" "$OUT_WA" "$MAX_WA" "$ORIG_FPS" "$HALF_FPS" "$WORK_DIR" \
-          > "$WORK_DIR/log_wa.txt" 2>&1 || touch "$WORK_DIR/fail_wa"
+        optimize_gif "WhatsApp-GIF" "$WORK_DIR/src_512.mkv" "$OUT_WA_GIF" "$MAX_WA" 512 512 1 "$ORIG_FPS" "$HALF_FPS" 85 "$WORK_DIR" \
+          > "$WORK_DIR/log_wa_gif.txt" 2>&1 || touch "$WORK_DIR/fail_wa_gif"
       ) & PIDS+=($!)
     fi
 
@@ -1136,7 +1135,7 @@ while IFS= read -r -d '' INPUT; do
     wait "$pid"
   done
 
-  for logf in "$WORK_DIR/log_wa.txt" "$WORK_DIR/log_wc.txt" "$WORK_DIR/log_tg.txt" "$WORK_DIR/log_sig.txt" "$WORK_DIR/log_line.txt" "$WORK_DIR/log_giphy.txt"; do
+  for logf in "$WORK_DIR/log_wa_webp.txt" "$WORK_DIR/log_wa_gif.txt" "$WORK_DIR/log_wc.txt" "$WORK_DIR/log_tg.txt" "$WORK_DIR/log_sig.txt" "$WORK_DIR/log_line.txt" "$WORK_DIR/log_giphy.txt"; do
     if [ -f "$logf" ]; then
       cat "$logf"
     fi

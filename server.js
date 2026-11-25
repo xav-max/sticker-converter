@@ -170,7 +170,8 @@ app.post('/upload', upload.any(), async (req, res) => {
             fs.unlinkSync(file.path);
         }
 
-        const whatsappFormat = req.body && req.body.whatsappFormat === 'gif' ? 'gif' : 'webp';
+        const rawWaFmt = (req.body && req.body.whatsappFormat) || 'webp';
+        const whatsappFormat = ['webp', 'gif', 'both'].includes(rawWaFmt) ? rawWaFmt : 'webp';
         const scriptPath = path.join(__dirname, 'process_stickers.sh');
         const processStickers = spawn('bash', [scriptPath, extractDir, outputDir], {
             env: { ...process.env, WHATSAPP_FORMAT: whatsappFormat },

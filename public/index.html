@@ -138,10 +138,16 @@
                             </div>
 
                             <div class="wa-format-bar">
-                                <span class="wa-format-label">WhatsApp output format</span>
-                                <div class="wa-format-options" role="group" aria-label="WhatsApp output format">
-                                    <button type="button" class="wa-opt-btn active" data-wa-fmt="webp">WebP (Full color · Recommended)</button>
-                                    <button type="button" class="wa-opt-btn" data-wa-fmt="gif">GIF</button>
+                                <span class="wa-format-label">WhatsApp output format(s)</span>
+                                <div class="wa-format-options" role="group" aria-label="WhatsApp output formats">
+                                    <label class="wa-check-pill">
+                                        <input type="checkbox" id="waWebpCheck" checked>
+                                        <span>WebP (Full color · Recommended)</span>
+                                    </label>
+                                    <label class="wa-check-pill">
+                                        <input type="checkbox" id="waGifCheck">
+                                        <span>GIF</span>
+                                    </label>
                                 </div>
                             </div>
 
@@ -497,14 +503,23 @@
         let currentSessionId = null;
         let currentManifest = null;
         let activeTab = 'all';
-        let selectedWaFormat = 'webp';
 
-        document.querySelectorAll('.wa-opt-btn').forEach((btn) => {
-            btn.addEventListener('click', () => {
-                selectedWaFormat = btn.dataset.waFmt || 'webp';
-                document.querySelectorAll('.wa-opt-btn').forEach((b) => {
-                    b.classList.toggle('active', b === btn);
-                });
+        const waWebpCheck = document.getElementById('waWebpCheck');
+        const waGifCheck = document.getElementById('waGifCheck');
+
+        function getSelectedWaFormat() {
+            const w = waWebpCheck.checked;
+            const g = waGifCheck.checked;
+            if (w && g) return 'both';
+            if (g) return 'gif';
+            return 'webp';
+        }
+
+        [waWebpCheck, waGifCheck].forEach((cb) => {
+            cb.addEventListener('change', () => {
+                if (!waWebpCheck.checked && !waGifCheck.checked) {
+                    cb.checked = true;
+                }
             });
         });
 
@@ -759,7 +774,8 @@
             activePlatforms.forEach((p) => {
                 const meta = PLATFORM_META[p];
                 const list = manifest[p];
-                const extDisplay = p === 'whatsapp' && list[0]?.ext ? list[0].ext : meta.ext;
+                const extList = [...new Set(list.map((f) => f.ext).filter(Boolean))];
+                const extDisplay = extList.length ? extList.join(' + ') : meta.ext;
                 const btn = document.createElement('a');
                 btn.className = 'dl-btn';
                 btn.href = `/download/${sessionId}/platform/${p}`;
@@ -927,7 +943,7 @@
             appendLog(`NEW BATCH: Uploading ${queuedItems.length} file(s) to fast pipeline...`);
 
             const formData = new FormData();
-            formData.append('whatsappFormat', selectedWaFormat);
+            formData.append('whatsappFormat', getSelectedWaFormat());
             queuedItems.forEach((item) => {
                 formData.append('stickers', item.file);
             });

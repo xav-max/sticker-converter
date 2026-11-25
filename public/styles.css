@@ -1002,11 +1002,15 @@ summary:focus-visible {
 
 .wa-format-options {
     display: inline-flex;
-    gap: 6px;
+    flex-wrap: wrap;
+    gap: 8px;
 }
 
-.wa-opt-btn {
-    padding: 5px 11px;
+.wa-check-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 6px 11px;
     color: var(--muted);
     background: rgba(255, 255, 255, 0.03);
     border: 1px solid var(--line);
@@ -1014,10 +1018,19 @@ summary:focus-visible {
     cursor: pointer;
     font-size: 11px;
     font-weight: 600;
+    user-select: none;
     transition: all 150ms ease;
 }
 
-.wa-opt-btn.active {
+.wa-check-pill input[type="checkbox"] {
+    accent-color: var(--accent);
+    width: 14px;
+    height: 14px;
+    margin: 0;
+    cursor: pointer;
+}
+
+.wa-check-pill:has(input:checked) {
     color: #fff;
     background: rgba(124, 140, 255, 0.22);
     border-color: var(--accent);
