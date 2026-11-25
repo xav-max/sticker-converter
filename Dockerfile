@@ -12,9 +12,9 @@ RUN cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr/local .. \
 # Stage 2: Runtime container
 FROM alpine:latest
 
-# Install FFmpeg, Bash, Node.js, NPM, Gifsicle, pngquant, and apngasm runtime libs
+# Install FFmpeg, Bash, Node.js, NPM, Gifsicle, pngquant, librsvg (rsvg-convert), and apngasm runtime libs
 RUN apk add --no-cache \
-    bash ffmpeg coreutils nodejs npm gifsicle pngquant \
+    bash ffmpeg coreutils nodejs npm gifsicle pngquant rsvg-convert \
     libpng zopfli libstdc++ \
     boost-filesystem boost-program_options boost-regex
 

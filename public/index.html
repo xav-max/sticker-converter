@@ -95,7 +95,7 @@
                     <div class="panel-heading">
                         <div>
                             <h2 id="uploadHeading">Drop your stickers</h2>
-                            <p>Drag multiple GIF / PNG files directly (no ZIP needed), preview all at once, then convert.</p>
+                            <p>Drag GIF, APNG (.png), or SVG files directly (no ZIP needed), preview all at once, then convert.</p>
                         </div>
                         <span class="step-index" aria-label="Step 1">01</span>
                     </div>
@@ -109,9 +109,9 @@
                                     </svg>
                                 </span>
                                 <h3 id="dropTitle">Drop stickers here (multi-file)</h3>
-                                <p>or click to browse and select multiple GIF / PNG / ZIP files</p>
-                                <span class="drop-hint">Multi-file GIF / PNG, or ZIP archive</span>
-                                <input type="file" name="stickers" id="fileInput" accept=".zip,.gif,.png" multiple hidden>
+                                <p>or click to browse and select multiple GIF / APNG / SVG / ZIP files</p>
+                                <span class="drop-hint">Multi-file GIF / APNG / SVG, or ZIP archive</span>
+                                <input type="file" name="stickers" id="fileInput" accept=".zip,.gif,.png,.svg" multiple hidden>
                             </div>
                         </div>
 
@@ -395,12 +395,17 @@
         };
         const SPECIAL_LABELS = {
             'main.gif': 'LINE main',
+            'main.png': 'LINE main',
+            'main.svg': 'LINE main',
             'tab.png': 'LINE tab',
             'tab.gif': 'LINE tab',
+            'tab.svg': 'LINE tab',
             'cover.png': 'WeChat cover',
             'cover.gif': 'WeChat cover',
+            'cover.svg': 'WeChat cover',
             'icon.png': 'WeChat icon',
             'icon.gif': 'WeChat icon',
+            'icon.svg': 'WeChat icon',
         };
 
         let queuedItems = []; // { id, file, url }
@@ -436,7 +441,7 @@
         function addFiles(fileList) {
             let rejected = 0;
             Array.from(fileList).forEach((file) => {
-                if (/\.(zip|gif|png)$/i.test(file.name)) {
+                if (/\.(zip|gif|png|svg)$/i.test(file.name)) {
                     const url = /\.zip$/i.test(file.name) ? null : URL.createObjectURL(file);
                     queuedItems.push({ id: nextItemId++, file, url });
                 } else {
@@ -444,7 +449,7 @@
                 }
             });
             if (rejected > 0) {
-                showStatus(`Skipped ${rejected} unsupported file(s). Please drop .gif, .png, or .zip files.`, 'error');
+                showStatus(`Skipped ${rejected} unsupported file(s). Please drop .gif, .png, .svg, or .zip files.`, 'error');
             } else {
                 statusMessage.style.display = 'none';
             }
@@ -535,7 +540,7 @@
                     img.src = item.url;
                     img.alt = item.file.name;
                     img.onload = () => {
-                        dimSpan.textContent = `${img.naturalWidth}×${img.naturalHeight}`;
+                        dimSpan.textContent = img.naturalWidth > 0 ? `${img.naturalWidth}×${img.naturalHeight}` : 'SVG';
                     };
                     thumb.appendChild(img);
                     thumb.addEventListener('click', (e) => {

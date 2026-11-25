@@ -23,20 +23,47 @@ mark_below_floor() {
 HAS_GIFSICLE=0
 HAS_PNGQUANT=0
 HAS_APNGASM=0
+HAS_RSVG=0
 if command -v gifsicle >/dev/null 2>&1; then HAS_GIFSICLE=1; fi
 if command -v pngquant >/dev/null 2>&1; then HAS_PNGQUANT=1; fi
 if command -v apngasm >/dev/null 2>&1; then HAS_APNGASM=1; fi
+if command -v rsvg-convert >/dev/null 2>&1; then HAS_RSVG=1; fi
 
 FAILED_CONVERSIONS=0
 
-FILE_COUNT=$(find "$INPUT_DIR" -maxdepth 3 -type f \( -iname "*.gif" -o -iname "*.png" \) ! -path "$PROCESSED_DIR/*" ! -path "*/__MACOSX/*" ! -name ".*" | wc -l | tr -d ' ')
+FILE_COUNT=$(find "$INPUT_DIR" -maxdepth 3 -type f \( -iname "*.gif" -o -iname "*.png" -o -iname "*.svg" \) ! -path "$PROCESSED_DIR/*" ! -path "*/__MACOSX/*" ! -name ".*" | wc -l | tr -d ' ')
 if [ "$FILE_COUNT" -eq 0 ]; then
   echo "No target files found in $INPUT_DIR."
   exit 0
 fi
 
 echo "Scanning $INPUT_DIR ($FILE_COUNT candidate file(s)) | WhatsApp format: $WHATSAPP_FORMAT..."
-echo "Encoders: ffmpeg=yes gifsicle=$HAS_GIFSICLE pngquant=$HAS_PNGQUANT apngasm=$HAS_APNGASM"
+echo "Encoders: ffmpeg=yes gifsicle=$HAS_GIFSICLE pngquant=$HAS_PNGQUANT apngasm=$HAS_APNGASM rsvg=$HAS_RSVG"
+
+# Probe exact frame count, duration (s), and FPS directly from APNG acTL/fcTL chunks
+probe_apng_meta() {
+  node -e '
+    const fs = require("fs");
+    const d = fs.readFileSync(process.argv[1]);
+    if (d.length < 8) process.exit(0);
+    let i = 8, frames = 0, dur = 0;
+    while (i + 12 <= d.length) {
+      const len = d.readUInt32BE(i);
+      const type = d.toString("ascii", i + 4, i + 8);
+      if (i + 12 + len > d.length) break;
+      if (type === "acTL" && len >= 8) {
+        frames = d.readUInt32BE(i + 8);
+      } else if (type === "fcTL" && len >= 26) {
+        const num = d.readUInt16BE(i + 20);
+        const den = d.readUInt16BE(i + 22) || 100;
+        dur += num / den;
+      }
+      i += 12 + len;
+    }
+    const fps = dur > 0 && frames > 0 ? Math.max(4, Math.min(60, Math.round(frames / dur))) : 15;
+    console.log(`${frames} ${dur > 0 ? dur.toFixed(4) : "2.0"} ${fps}`);
+  ' "$1"
+}
 
 strip_apng_chunks() {
   local target_file="$1"
@@ -738,40 +765,120 @@ while IFS= read -r -d '' INPUT; do
   BASENAME="${FULL_BASENAME%.*}"
   LOWER_NAME=$(echo "$FULL_BASENAME" | tr '[:upper:]' '[:lower:]')
 
-  if [[ "$LOWER_NAME" == "tab.png" || "$LOWER_NAME" == "tab.gif" ]]; then
+  if [[ "$LOWER_NAME" == "tab.png" || "$LOWER_NAME" == "tab.gif" || "$LOWER_NAME" == "tab.svg" ]]; then
     echo "=== Processing SPECIAL: $FULL_BASENAME -> LINE tab.png ==="
-    ffmpeg -nostdin -y -v error -i "$INPUT" -vf "scale=96:74,format=rgba" -frames:v 1 "$OUTPUT_DIR/line/tab.png"
+    if [[ "$LOWER_NAME" == "tab.svg" && "$HAS_RSVG" -eq 1 ]]; then
+      rsvg-convert -w 96 -h 74 -a "$INPUT" -o "$OUTPUT_DIR/line/tab.png"
+    else
+      ffmpeg -nostdin -y -v error -i "$INPUT" -vf "scale=96:74,format=rgba" -frames:v 1 "$OUTPUT_DIR/line/tab.png"
+    fi
     mv "$INPUT" "$PROCESSED_DIR/"
     continue
   fi
 
-  if [[ "$LOWER_NAME" == "cover.png" || "$LOWER_NAME" == "cover.gif" ]]; then
+  if [[ "$LOWER_NAME" == "cover.png" || "$LOWER_NAME" == "cover.gif" || "$LOWER_NAME" == "cover.svg" ]]; then
     echo "=== Processing SPECIAL: $FULL_BASENAME -> WECHAT cover.png ==="
-    ffmpeg -nostdin -y -v error -i "$INPUT" -vf "scale=240:240,format=rgba" -frames:v 1 "$OUTPUT_DIR/wechat/cover.png"
+    if [[ "$LOWER_NAME" == "cover.svg" && "$HAS_RSVG" -eq 1 ]]; then
+      rsvg-convert -w 240 -h 240 -a "$INPUT" -o "$OUTPUT_DIR/wechat/cover.png"
+    else
+      ffmpeg -nostdin -y -v error -i "$INPUT" -vf "scale=240:240,format=rgba" -frames:v 1 "$OUTPUT_DIR/wechat/cover.png"
+    fi
     mv "$INPUT" "$PROCESSED_DIR/"
     continue
   fi
 
-  if [[ "$LOWER_NAME" == "icon.png" || "$LOWER_NAME" == "icon.gif" ]]; then
+  if [[ "$LOWER_NAME" == "icon.png" || "$LOWER_NAME" == "icon.gif" || "$LOWER_NAME" == "icon.svg" ]]; then
     echo "=== Processing SPECIAL: $FULL_BASENAME -> WECHAT icon.png ==="
-    ffmpeg -nostdin -y -v error -i "$INPUT" -vf "scale=50:50,format=rgba" -frames:v 1 "$OUTPUT_DIR/wechat/icon.png"
+    if [[ "$LOWER_NAME" == "icon.svg" && "$HAS_RSVG" -eq 1 ]]; then
+      rsvg-convert -w 50 -h 50 -a "$INPUT" -o "$OUTPUT_DIR/wechat/icon.png"
+    else
+      ffmpeg -nostdin -y -v error -i "$INPUT" -vf "scale=50:50,format=rgba" -frames:v 1 "$OUTPUT_DIR/wechat/icon.png"
+    fi
     mv "$INPUT" "$PROCESSED_DIR/"
     continue
   fi
 
   EXT="${FULL_BASENAME##*.}"
   LOWER_EXT=$(echo "$EXT" | tr '[:upper:]' '[:lower:]')
+
+  if [ "$LOWER_EXT" == "svg" ]; then
+    echo "=== Processing SVG: $FULL_BASENAME ==="
+    if [ "$HAS_RSVG" -eq 0 ]; then
+      echo "WARNING: rsvg-convert not installed; skipping $FULL_BASENAME"
+      mv "$INPUT" "$PROCESSED_DIR/"
+      continue
+    fi
+    if grep -qiE "<animate|@keyframes" "$INPUT"; then
+      echo "WARNING: $FULL_BASENAME contains SVG animation tags; rasterizing static frame 0 (APNG is recommended for animated stickers)."
+    fi
+
+    SVG_WORK=$(mktemp -d)
+    rsvg-convert -w 512 -h 512 -a "$INPUT" -o "$SVG_WORK/svg_512.png"
+
+    IS_SVG_MAIN=0
+    if [ "$LOWER_NAME" == "main.svg" ]; then IS_SVG_MAIN=1; fi
+
+    if [ "$IS_SVG_MAIN" -eq 0 ]; then
+      if [ "$WHATSAPP_FORMAT" == "gif" ]; then
+        ffmpeg -nostdin -y -v error -i "$SVG_WORK/svg_512.png" \
+          -vf "scale=512:512:flags=lanczos:force_original_aspect_ratio=decrease,pad=512:512:(ow-iw)/2:(oh-ih)/2:color=0x00000000,split[s0][s1];[s0]palettegen=max_colors=256:reserve_transparent=1[p];[s1][p]paletteuse" \
+          "$OUTPUT_DIR/whatsapp/${BASENAME}_whatsapp.gif"
+      else
+        ffmpeg -nostdin -y -v error -i "$SVG_WORK/svg_512.png" \
+          -vf "scale=512:512:flags=lanczos:force_original_aspect_ratio=decrease,pad=512:512:(ow-iw)/2:(oh-ih)/2:color=0x00000000" \
+          -c:v libwebp -lossless 0 -q:v 90 "$OUTPUT_DIR/whatsapp/${BASENAME}_whatsapp.webp"
+      fi
+
+      ffmpeg -nostdin -y -v error -i "$SVG_WORK/svg_512.png" \
+        -vf "scale=240:240:flags=lanczos:force_original_aspect_ratio=decrease,split[s0][s1];[s0]palettegen=max_colors=256:reserve_transparent=1[p];[s1][p]paletteuse" \
+        "$OUTPUT_DIR/wechat/${BASENAME}_wechat.gif"
+
+      ffmpeg -nostdin -y -v error -loop 1 -i "$SVG_WORK/svg_512.png" -t 0.2 -r 10 \
+        -vf "scale=512:512:flags=lanczos:force_original_aspect_ratio=decrease,scale='trunc(iw/2)*2':'trunc(ih/2)*2'" \
+        -c:v libvpx-vp9 -pix_fmt yuva420p -auto-alt-ref 0 -b:v 200k -an "$OUTPUT_DIR/telegram/${BASENAME}_telegram.webm"
+
+      ffmpeg -nostdin -y -v error -i "$SVG_WORK/svg_512.png" \
+        -vf "scale=512:512:flags=lanczos:force_original_aspect_ratio=decrease,pad=512:512:(ow-iw)/2:(oh-ih)/2:color=0x00000000" \
+        "$OUTPUT_DIR/signal/${BASENAME}_signal.png"
+      if [ "$HAS_PNGQUANT" -eq 1 ]; then
+        pngquant 256 --speed 1 --force --ext .png "$OUTPUT_DIR/signal/${BASENAME}_signal.png" >/dev/null 2>&1 || true
+      fi
+    fi
+
+    if [ "$IS_SVG_MAIN" -eq 1 ]; then
+      rsvg-convert -w 240 -h 240 -a "$INPUT" -o "$OUTPUT_DIR/line/main.png"
+    else
+      rsvg-convert -w 320 -h 270 -a "$INPUT" -o "$OUTPUT_DIR/line/${BASENAME}_line.png"
+    fi
+    if [ "$HAS_PNGQUANT" -eq 1 ]; then
+      if [ "$IS_SVG_MAIN" -eq 1 ]; then
+        pngquant 256 --speed 1 --force --ext .png "$OUTPUT_DIR/line/main.png" >/dev/null 2>&1 || true
+      else
+        pngquant 256 --speed 1 --force --ext .png "$OUTPUT_DIR/line/${BASENAME}_line.png" >/dev/null 2>&1 || true
+      fi
+    fi
+
+    rm -rf "$SVG_WORK"
+    mv "$INPUT" "$PROCESSED_DIR/"
+    echo "Finished SVG $BASENAME."
+    continue
+  fi
+
+  APNG_FRAMES=0
+  APNG_DUR=""
+  APNG_FPS=""
   if [ "$LOWER_EXT" == "png" ]; then
-    NB_FRAMES=$(ffprobe -v error -count_frames -select_streams v:0 -show_entries stream=nb_read_frames -of default=noprint_wrappers=1:nokey=1 "$INPUT" 2>/dev/null | head -n1)
-    if [ -z "$NB_FRAMES" ] || [ "$NB_FRAMES" -le 1 ] 2>/dev/null; then
+    read -r APNG_FRAMES APNG_DUR APNG_FPS <<< "$(probe_apng_meta "$INPUT")"
+    if [ -z "$APNG_FRAMES" ] || [ "$APNG_FRAMES" -le 1 ] 2>/dev/null; then
       echo "Skipping static non-special PNG file: $FULL_BASENAME"
       mv "$INPUT" "$PROCESSED_DIR/"
       continue
     fi
+    echo "Detected APNG: $FULL_BASENAME (${APNG_FRAMES} frames, ${APNG_DUR}s, ~${APNG_FPS} FPS)"
   fi
 
   IS_MAIN=0
-  if [ "$LOWER_NAME" == "main.gif" ]; then
+  if [[ "$LOWER_NAME" == "main.gif" || "$LOWER_NAME" == "main.png" ]]; then
     IS_MAIN=1
     echo "=== Processing SPECIAL: $FULL_BASENAME (LINE main) ==="
   else
@@ -807,23 +914,28 @@ while IFS= read -r -d '' INPUT; do
     OUT_LINE="$OUTPUT_DIR/line/${BASENAME}_line.png"
   fi
 
-  DUR=$(ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "$INPUT" 2>/dev/null)
-  if [ -z "$DUR" ] || [ "$DUR" == "N/A" ]; then DUR="2.0"; fi
+  if [ -n "$APNG_DUR" ] && [ "$APNG_FRAMES" -gt 1 ] 2>/dev/null; then
+    DUR="$APNG_DUR"
+    ORIG_FPS="$APNG_FPS"
+  else
+    DUR=$(ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "$INPUT" 2>/dev/null)
+    if [ -z "$DUR" ] || [ "$DUR" == "N/A" ]; then DUR="2.0"; fi
 
-  RAW_FPS=$(ffprobe -v error -select_streams v:0 -show_entries stream=r_frame_rate -of default=noprint_wrappers=1:nokey=1 "$INPUT" 2>/dev/null | head -n1)
-  ORIG_FPS=$(awk -v r="$RAW_FPS" 'BEGIN {
-    split(r, a, "/");
-    if (a[2] > 0) {
-      f = int(a[1] / a[2] + 0.5);
-    } else if (a[1] > 0) {
-      f = int(a[1] + 0.5);
-    } else {
-      f = 15;
-    }
-    if (f < 4) f = 4;
-    if (f > 60) f = 60;
-    print f;
-  }')
+    RAW_FPS=$(ffprobe -v error -select_streams v:0 -show_entries stream=r_frame_rate -of default=noprint_wrappers=1:nokey=1 "$INPUT" 2>/dev/null | head -n1)
+    ORIG_FPS=$(awk -v r="$RAW_FPS" 'BEGIN {
+      split(r, a, "/");
+      if (a[2] > 0) {
+        f = int(a[1] / a[2] + 0.5);
+      } else if (a[1] > 0) {
+        f = int(a[1] + 0.5);
+      } else {
+        f = 15;
+      }
+      if (f < 4) f = 4;
+      if (f > 60) f = 60;
+      print f;
+    }')
+  fi
 
   CAP_FPS="$ORIG_FPS"
   if [ "$CAP_FPS" -gt 30 ]; then CAP_FPS=30; fi
@@ -928,7 +1040,7 @@ while IFS= read -r -d '' INPUT; do
   mv "$INPUT" "$PROCESSED_DIR/"
   echo "Finished $BASENAME."
 
-done < <(find "$INPUT_DIR" -maxdepth 3 -type f \( -iname "*.gif" -o -iname "*.png" \) ! -path "$PROCESSED_DIR/*" ! -path "*/__MACOSX/*" ! -name ".*" -print0)
+done < <(find "$INPUT_DIR" -maxdepth 3 -type f \( -iname "*.gif" -o -iname "*.png" -o -iname "*.svg" \) ! -path "$PROCESSED_DIR/*" ! -path "*/__MACOSX/*" ! -name ".*" -print0)
 
 echo "=== All Stickers Processed! ==="
 if [ "$FAILED_CONVERSIONS" -gt 0 ]; then

@@ -141,7 +141,7 @@ app.post('/upload', upload.any(), async (req, res) => {
 
         for (const file of uploadedFiles) {
             const safeName = sanitizeFilename(file.originalname);
-            if (/\.(gif|png)$/i.test(safeName)) {
+            if (/\.(gif|png|svg)$/i.test(safeName)) {
                 const destPath = getUniquePath(extractDir, safeName);
                 fs.copyFileSync(file.path, destPath);
             } else if (/\.zip$/i.test(safeName)) {
