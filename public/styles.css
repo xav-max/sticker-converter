@@ -1341,6 +1341,162 @@ summary:focus-visible {
     margin-top: 14px;
 }
 
+/* Workspace Mode Switcher & PNG Sequence -> APNG Studio */
+.mode-tabs {
+    display: inline-flex;
+    gap: 6px;
+    padding: 4px;
+    margin-bottom: 18px;
+    background: var(--surface-soft);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+}
+
+.mode-tab {
+    padding: 7px 14px;
+    color: var(--muted);
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 7px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 600;
+    transition: all 150ms ease;
+}
+
+.mode-tab:hover {
+    color: var(--text);
+}
+
+.mode-tab.active {
+    color: #fff;
+    background: rgba(124, 140, 255, 0.22);
+    border-color: rgba(124, 140, 255, 0.5);
+}
+
+.seq-controls {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: 10px;
+    margin-top: 16px;
+    padding: 13px;
+    background: var(--surface-soft);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+}
+
+.seq-field {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.seq-field label {
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 500;
+}
+
+.seq-field input {
+    width: 100%;
+    padding: 7px 10px;
+    color: var(--text);
+    background: #0a1020;
+    border: 1px solid var(--line);
+    border-radius: 7px;
+    font-size: 13px;
+}
+
+.seq-field input:focus {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+}
+
+.seq-frame-badge {
+    position: absolute;
+    top: 6px;
+    left: 6px;
+    padding: 2px 6px;
+    color: #fff;
+    background: rgba(7, 10, 20, 0.84);
+    border: 1px solid rgba(124, 140, 255, 0.4);
+    border-radius: 5px;
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+    font-size: 10px;
+    font-weight: 700;
+}
+
+.seq-reorder {
+    display: inline-flex;
+    gap: 4px;
+}
+
+.seq-move-btn {
+    padding: 1px 6px;
+    color: var(--muted);
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 10px;
+}
+
+.seq-move-btn:hover:not(:disabled) {
+    color: #fff;
+    border-color: var(--accent);
+}
+
+.seq-move-btn:disabled {
+    opacity: 0.35;
+    cursor: default;
+}
+
+.apng-result-box {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 18px;
+    margin-top: 18px;
+    padding: 16px;
+    background: var(--surface-soft);
+    border: 1px solid rgba(84, 214, 160, 0.3);
+    border-radius: 12px;
+}
+
+.apng-result-preview {
+    width: 156px;
+    flex: 0 0 auto;
+    border-radius: 10px;
+    border: 1px solid var(--line);
+}
+
+.apng-result-info {
+    flex: 1 1 220px;
+    min-width: 0;
+}
+
+.apng-result-info h3 {
+    margin: 0 0 4px;
+    font-size: 15px;
+    font-weight: 650;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.apng-result-info p {
+    margin: 0 0 14px;
+    color: var(--muted);
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+    font-size: 11px;
+}
+
+.apng-result-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
 @media (max-width: 760px) {
     body {
         padding: 22px 16px 40px;

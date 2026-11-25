@@ -1,10 +1,13 @@
 const express = require('express');
 const multer = require('multer');
 const AdmZip = require('adm-zip');
-const { spawn } = require('child_process');
+const { spawn, execFile } = require('child_process');
+const { promisify } = require('util');
 const fs = require('fs');
 const path = require('path');
 const zlib = require('zlib');
+
+const execFileAsync = promisify(execFile);
 
 const app = express();
 const port = 8080;
@@ -13,6 +16,7 @@ app.use(express.static('public'));
 
 const upload = multer({ dest: '/tmp/uploads/' });
 const activeSessions = {};
+const activeApngs = {};
 
 const PLATFORMS = ['whatsapp', 'wechat', 'telegram', 'signal', 'line'];
 const PLATFORM_LIMITS = {
@@ -102,11 +106,25 @@ function cleanupSession(sessionId) {
     delete activeSessions[sessionId];
 }
 
+function cleanupApng(apngId) {
+    try {
+        fs.rmSync(path.join('/tmp/apng_build', apngId), { recursive: true, force: true });
+    } catch (err) {
+        console.error(`Cleanup error for apng ${apngId}:`, err);
+    }
+    delete activeApngs[apngId];
+}
+
 setInterval(() => {
     const now = Date.now();
     for (const [sessionId, session] of Object.entries(activeSessions)) {
         if (now - session.lastAccessedAt > SESSION_TTL_MS) {
             cleanupSession(sessionId);
+        }
+    }
+    for (const [apngId, item] of Object.entries(activeApngs)) {
+        if (now - item.lastAccessedAt > SESSION_TTL_MS) {
+            cleanupApng(apngId);
         }
     }
 }, 5 * 60 * 1000).unref();
@@ -344,6 +362,109 @@ app.delete('/session/:sessionId', (req, res) => {
         cleanupSession(sessionId);
     }
     res.json({ ok: true });
+});
+
+// 7. COMBINE PNG SEQUENCE INTO LOSSLESS APNG
+app.post('/combine-apng', upload.array('frames', 300), async (req, res) => {
+    const frameFiles = req.files || [];
+    if (frameFiles.length < 2) {
+        frameFiles.forEach((f) => fs.existsSync(f.path) && fs.unlinkSync(f.path));
+        return res.status(400).json({ error: 'Please upload at least 2 PNG frames.' });
+    }
+
+    const fps = Math.max(1, Math.min(60, parseInt(req.body?.fps, 10) || 12));
+    const loops = Math.max(0, Math.min(100, Number.isFinite(Number(req.body?.loops)) ? parseInt(req.body.loops, 10) : 0));
+    let rawOutName = sanitizeFilename(req.body?.filename || 'sticker_animated.png');
+    if (!/\.png$/i.test(rawOutName)) {
+        rawOutName = `${rawOutName.replace(/\.[^.]+$/, '')}.png`;
+    }
+
+    const apngId = `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    const workDir = path.join('/tmp/apng_build', apngId);
+    const framesDir = path.join(workDir, 'frames');
+    const outPath = path.join(workDir, rawOutName);
+
+    try {
+        fs.mkdirSync(framesDir, { recursive: true });
+
+        // Probe first frame dimensions as target canvas
+        const { stdout: probeOut } = await execFileAsync('ffprobe', [
+            '-v', 'error',
+            '-select_streams', 'v:0',
+            '-show_entries', 'stream=width,height',
+            '-of', 'csv=p=0:s=x',
+            frameFiles[0].path,
+        ]);
+        const [wRaw, hRaw] = probeOut.trim().split('x').map((n) => parseInt(n, 10));
+        const width = wRaw > 0 ? wRaw : 512;
+        const height = hRaw > 0 ? hRaw : 512;
+
+        // Normalize every frame to uniform RGBA dimensions so apngasm handles mixed color types/sizes cleanly
+        const normPaths = [];
+        for (let idx = 0; idx < frameFiles.length; idx++) {
+            const dest = path.join(framesDir, `f_${String(idx + 1).padStart(4, '0')}.png`);
+            await execFileAsync('ffmpeg', [
+                '-nostdin', '-y', '-v', 'error',
+                '-i', frameFiles[idx].path,
+                '-vf', `scale=${width}:${height}:flags=lanczos:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2:color=0x00000000,format=rgba`,
+                '-frames:v', '1',
+                dest,
+            ]);
+            normPaths.push(dest);
+            fs.unlinkSync(frameFiles[idx].path);
+        }
+
+        await execFileAsync('apngasm', [
+            '-o', outPath,
+            ...normPaths,
+            '-d', `1:${fps}`,
+            '-l', String(loops),
+            '-F',
+        ]);
+
+        fs.rmSync(framesDir, { recursive: true, force: true });
+
+        const stat = fs.statSync(outPath);
+        activeApngs[apngId] = {
+            filePath: outPath,
+            filename: rawOutName,
+            lastAccessedAt: Date.now(),
+        };
+
+        res.json({
+            apngId,
+            filename: rawOutName,
+            size: stat.size,
+            width,
+            height,
+            frames: normPaths.length,
+            fps,
+            loops,
+            duration: Number((normPaths.length / fps).toFixed(2)),
+            previewUrl: `/apng/${apngId}`,
+            downloadUrl: `/apng/${apngId}?download=1`,
+        });
+    } catch (err) {
+        frameFiles.forEach((f) => fs.existsSync(f.path) && fs.unlinkSync(f.path));
+        cleanupApng(apngId);
+        console.error('Combine APNG error:', err);
+        res.status(500).json({ error: `Failed to combine PNG sequence: ${err.message}` });
+    }
+});
+
+app.get('/apng/:apngId', (req, res) => {
+    const { apngId } = req.params;
+    const item = activeApngs[apngId];
+    if (!item || !fs.existsSync(item.filePath)) {
+        return res.status(404).send('APNG not found');
+    }
+    item.lastAccessedAt = Date.now();
+    if (req.query.download === '1') {
+        return res.download(item.filePath, item.filename);
+    }
+    res.setHeader('Content-Type', 'image/png');
+    res.setHeader('Cache-Control', 'no-store');
+    res.sendFile(item.filePath);
 });
 
 app.listen(port, () => console.log(`Server listening on port ${port}`));

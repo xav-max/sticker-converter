@@ -92,32 +92,92 @@
         <main>
             <div class="workspace-grid">
                 <section class="panel upload-panel" aria-labelledby="uploadHeading">
-                    <div class="panel-heading">
-                        <div>
-                            <h2 id="uploadHeading">Drop your stickers</h2>
-                            <p>Drag GIF, APNG (.png), or SVG files directly (no ZIP needed), preview all at once, then convert.</p>
-                        </div>
-                        <span class="step-index" aria-label="Step 1">01</span>
+                    <div class="mode-tabs" role="tablist" aria-label="Workspace mode">
+                        <button type="button" class="mode-tab active" id="tabConverterBtn" role="tab" aria-selected="true">Convert Stickers</button>
+                        <button type="button" class="mode-tab" id="tabAssemblerBtn" role="tab" aria-selected="false">PNG Sequence → APNG</button>
                     </div>
 
-                    <form id="uploadForm" enctype="multipart/form-data">
-                        <div class="drop-zone" id="dropZone" role="button" tabindex="0" aria-label="Choose or drop sticker files">
+                    <div id="converterView">
+                        <div class="panel-heading">
+                            <div>
+                                <h2 id="uploadHeading">Drop your stickers</h2>
+                                <p>Drag GIF, APNG (.png), or SVG files directly (no ZIP needed), preview all at once, then convert.</p>
+                            </div>
+                            <span class="step-index" aria-label="Step 1">01</span>
+                        </div>
+
+                        <form id="uploadForm" enctype="multipart/form-data">
+                            <div class="drop-zone" id="dropZone" role="button" tabindex="0" aria-label="Choose or drop sticker files">
+                                <div class="drop-zone-content">
+                                    <span class="upload-icon" aria-hidden="true">
+                                        <svg viewBox="0 0 24 24" fill="none">
+                                            <path d="M12 15V4m0 0L8 8m4-4 4 4M5 14v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+                                        </svg>
+                                    </span>
+                                    <h3 id="dropTitle">Drop stickers here (multi-file)</h3>
+                                    <p>or click to browse and select multiple GIF / APNG / SVG / ZIP files</p>
+                                    <span class="drop-hint">Multi-file GIF / APNG / SVG, or ZIP archive</span>
+                                    <input type="file" name="stickers" id="fileInput" accept=".zip,.gif,.png,.svg" multiple hidden>
+                                </div>
+                            </div>
+
+                            <div id="stagingWrapper" style="display: none;">
+                                <div class="staging-header">
+                                    <div class="staging-count" id="stagingCount">0 stickers queued</div>
+                                    <div class="staging-actions">
+                                        <div class="bg-switcher" role="group" aria-label="Preview background">
+                                            <button type="button" class="bg-switch-btn active" data-bg="transparent"><span class="bg-swatch transparent"></span>Transparent</button>
+                                            <button type="button" class="bg-switch-btn" data-bg="black"><span class="bg-swatch black"></span>Black</button>
+                                            <button type="button" class="bg-switch-btn" data-bg="white"><span class="bg-swatch white"></span>White</button>
+                                            <button type="button" class="bg-switch-btn" data-bg="green"><span class="bg-swatch green"></span>Green</button>
+                                        </div>
+                                        <button type="button" id="clearAllBtn" class="ghost-btn">Clear all</button>
+                                    </div>
+                                </div>
+                                <div class="sticker-grid" id="stagingGrid"></div>
+                            </div>
+
+                            <div class="wa-format-bar">
+                                <span class="wa-format-label">WhatsApp output format</span>
+                                <div class="wa-format-options" role="group" aria-label="WhatsApp output format">
+                                    <button type="button" class="wa-opt-btn active" data-wa-fmt="webp">WebP (Full color · Recommended)</button>
+                                    <button type="button" class="wa-opt-btn" data-wa-fmt="gif">GIF</button>
+                                </div>
+                            </div>
+
+                            <button type="submit" id="convertBtn" class="convert-btn" disabled>
+                                <span class="btn-text">Convert Stickers</span>
+                                <div class="spinner" id="spinner" style="display: none;"></div>
+                            </button>
+                        </form>
+                    </div>
+
+                    <div id="assemblerView" style="display: none;">
+                        <div class="panel-heading">
+                            <div>
+                                <h2>Combine PNG sequence into APNG</h2>
+                                <p>Drop your PNG frames in sequence, set FPS &amp; loops, then download the APNG or send it straight to the converter.</p>
+                            </div>
+                            <span class="step-index" aria-label="APNG Builder">APNG</span>
+                        </div>
+
+                        <div class="drop-zone" id="seqDropZone" role="button" tabindex="0" aria-label="Choose or drop PNG frames">
                             <div class="drop-zone-content">
                                 <span class="upload-icon" aria-hidden="true">
                                     <svg viewBox="0 0 24 24" fill="none">
                                         <path d="M12 15V4m0 0L8 8m4-4 4 4M5 14v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
                                     </svg>
                                 </span>
-                                <h3 id="dropTitle">Drop stickers here (multi-file)</h3>
-                                <p>or click to browse and select multiple GIF / APNG / SVG / ZIP files</p>
-                                <span class="drop-hint">Multi-file GIF / APNG / SVG, or ZIP archive</span>
-                                <input type="file" name="stickers" id="fileInput" accept=".zip,.gif,.png,.svg" multiple hidden>
+                                <h3 id="seqDropTitle">Drop PNG sequence frames here</h3>
+                                <p>Select multiple .png frames (auto-sorted naturally by filename)</p>
+                                <span class="drop-hint">2+ PNG frames · lossless RGBA APNG</span>
+                                <input type="file" id="seqFileInput" accept=".png" multiple hidden>
                             </div>
                         </div>
 
-                        <div id="stagingWrapper" style="display: none;">
+                        <div id="seqWrapper" style="display: none;">
                             <div class="staging-header">
-                                <div class="staging-count" id="stagingCount">0 stickers queued</div>
+                                <div class="staging-count" id="seqCount">0 frames</div>
                                 <div class="staging-actions">
                                     <div class="bg-switcher" role="group" aria-label="Preview background">
                                         <button type="button" class="bg-switch-btn active" data-bg="transparent"><span class="bg-swatch transparent"></span>Transparent</button>
@@ -125,25 +185,46 @@
                                         <button type="button" class="bg-switch-btn" data-bg="white"><span class="bg-swatch white"></span>White</button>
                                         <button type="button" class="bg-switch-btn" data-bg="green"><span class="bg-swatch green"></span>Green</button>
                                     </div>
-                                    <button type="button" id="clearAllBtn" class="ghost-btn">Clear all</button>
+                                    <button type="button" id="seqSortBtn" class="ghost-btn">Sort 1→9</button>
+                                    <button type="button" id="seqReverseBtn" class="ghost-btn">Reverse</button>
+                                    <button type="button" id="seqClearBtn" class="ghost-btn">Clear</button>
                                 </div>
                             </div>
-                            <div class="sticker-grid" id="stagingGrid"></div>
+                            <div class="sticker-grid" id="seqGrid"></div>
                         </div>
 
-                        <div class="wa-format-bar">
-                            <span class="wa-format-label">WhatsApp output format</span>
-                            <div class="wa-format-options" role="group" aria-label="WhatsApp output format">
-                                <button type="button" class="wa-opt-btn active" data-wa-fmt="webp">WebP (Full color · Recommended)</button>
-                                <button type="button" class="wa-opt-btn" data-wa-fmt="gif">GIF</button>
+                        <div class="seq-controls">
+                            <div class="seq-field">
+                                <label for="seqFpsInput">Frame Rate (FPS)</label>
+                                <input type="number" id="seqFpsInput" min="1" max="60" value="12">
+                            </div>
+                            <div class="seq-field">
+                                <label for="seqLoopsInput">Loops (0 = Infinite)</label>
+                                <input type="number" id="seqLoopsInput" min="0" max="100" value="0">
+                            </div>
+                            <div class="seq-field">
+                                <label for="seqNameInput">Output Filename</label>
+                                <input type="text" id="seqNameInput" value="sticker_animated.png" placeholder="sticker_animated.png">
                             </div>
                         </div>
 
-                        <button type="submit" id="convertBtn" class="convert-btn" disabled>
-                            <span class="btn-text">Convert Stickers</span>
-                            <div class="spinner" id="spinner" style="display: none;"></div>
+                        <button type="button" id="combineApngBtn" class="convert-btn" disabled>
+                            <span id="combineBtnText">Combine into APNG</span>
+                            <div class="spinner" id="combineSpinner" style="display: none;"></div>
                         </button>
-                    </form>
+
+                        <div id="apngResultBox" class="apng-result-box" style="display: none;">
+                            <div id="apngResultThumb" class="sticker-thumb apng-result-preview clickable bg-transparent"></div>
+                            <div class="apng-result-info">
+                                <h3 id="apngResultName">sticker_animated.png</h3>
+                                <p id="apngResultMeta"></p>
+                                <div class="apng-result-actions">
+                                    <a id="apngDownloadLink" class="dl-btn" href="#">Download APNG</a>
+                                    <button type="button" id="sendApngToConverterBtn" class="dl-btn primary">Send to Converter →</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
 
                     <div class="format-row" aria-label="Supported output formats">
                         <span class="format-label">OUTPUT FORMATS</span>
@@ -907,6 +988,300 @@
                 btnText.textContent = `Convert ${queuedItems.length} Sticker${queuedItems.length > 1 ? 's' : ''}`;
                 spinner.style.display = 'none';
                 convertBtn.disabled = false;
+            }
+        });
+
+        // PNG Sequence -> APNG Studio
+        const tabConverterBtn = document.getElementById('tabConverterBtn');
+        const tabAssemblerBtn = document.getElementById('tabAssemblerBtn');
+        const converterView = document.getElementById('converterView');
+        const assemblerView = document.getElementById('assemblerView');
+        const seqDropZone = document.getElementById('seqDropZone');
+        const seqDropTitle = document.getElementById('seqDropTitle');
+        const seqFileInput = document.getElementById('seqFileInput');
+        const seqWrapper = document.getElementById('seqWrapper');
+        const seqCount = document.getElementById('seqCount');
+        const seqGrid = document.getElementById('seqGrid');
+        const seqSortBtn = document.getElementById('seqSortBtn');
+        const seqReverseBtn = document.getElementById('seqReverseBtn');
+        const seqClearBtn = document.getElementById('seqClearBtn');
+        const seqFpsInput = document.getElementById('seqFpsInput');
+        const seqLoopsInput = document.getElementById('seqLoopsInput');
+        const seqNameInput = document.getElementById('seqNameInput');
+        const combineApngBtn = document.getElementById('combineApngBtn');
+        const combineBtnText = document.getElementById('combineBtnText');
+        const combineSpinner = document.getElementById('combineSpinner');
+        const apngResultBox = document.getElementById('apngResultBox');
+        const apngResultThumb = document.getElementById('apngResultThumb');
+        const apngResultName = document.getElementById('apngResultName');
+        const apngResultMeta = document.getElementById('apngResultMeta');
+        const apngDownloadLink = document.getElementById('apngDownloadLink');
+        const sendApngToConverterBtn = document.getElementById('sendApngToConverterBtn');
+
+        let seqFrames = []; // { id, file, url }
+        let nextSeqId = 1;
+        let lastCombinedApng = null;
+
+        function switchWorkspaceMode(mode) {
+            const isAssembler = mode === 'assembler';
+            tabConverterBtn.classList.toggle('active', !isAssembler);
+            tabConverterBtn.setAttribute('aria-selected', String(!isAssembler));
+            tabAssemblerBtn.classList.toggle('active', isAssembler);
+            tabAssemblerBtn.setAttribute('aria-selected', String(isAssembler));
+            converterView.style.display = isAssembler ? 'none' : 'block';
+            assemblerView.style.display = isAssembler ? 'block' : 'none';
+            statusMessage.style.display = 'none';
+        }
+
+        tabConverterBtn.addEventListener('click', () => switchWorkspaceMode('converter'));
+        tabAssemblerBtn.addEventListener('click', () => switchWorkspaceMode('assembler'));
+
+        function naturalSortFrames() {
+            seqFrames.sort((a, b) => a.file.name.localeCompare(b.file.name, undefined, { numeric: true, sensitivity: 'base' }));
+            renderSeqGrid();
+        }
+
+        function addSeqFrames(fileList) {
+            let rejected = 0;
+            Array.from(fileList).forEach((file) => {
+                if (/\.png$/i.test(file.name)) {
+                    seqFrames.push({ id: nextSeqId++, file, url: URL.createObjectURL(file) });
+                } else {
+                    rejected += 1;
+                }
+            });
+            if (rejected > 0) {
+                showStatus(`Skipped ${rejected} non-PNG file(s). Please drop .png frames.`, 'error');
+            } else {
+                statusMessage.style.display = 'none';
+            }
+            naturalSortFrames();
+        }
+
+        function updateSeqSummary() {
+            const fps = Math.max(1, Math.min(60, parseInt(seqFpsInput.value, 10) || 12));
+            const dur = (seqFrames.length / fps).toFixed(2);
+            seqCount.innerHTML = `${seqFrames.length} frame${seqFrames.length === 1 ? '' : 's'} <span>(~${dur}s at ${fps} FPS)</span>`;
+        }
+
+        seqFpsInput.addEventListener('input', updateSeqSummary);
+
+        function renderSeqGrid() {
+            seqGrid.innerHTML = '';
+            const count = seqFrames.length;
+            if (count === 0) {
+                seqWrapper.style.display = 'none';
+                seqDropZone.classList.remove('compact');
+                seqDropTitle.textContent = 'Drop PNG sequence frames here';
+                combineApngBtn.disabled = true;
+                combineBtnText.textContent = 'Combine into APNG';
+                return;
+            }
+
+            seqWrapper.style.display = 'block';
+            seqDropZone.classList.add('compact');
+            seqDropTitle.textContent = '+ Drop or click to add more PNG frames';
+            combineApngBtn.disabled = count < 2;
+            combineBtnText.textContent = count < 2 ? 'Add at least 2 PNG frames' : `Combine ${count} Frames into APNG`;
+            updateSeqSummary();
+
+            seqFrames.forEach((item, idx) => {
+                const card = document.createElement('div');
+                card.className = 'sticker-card';
+
+                const thumb = document.createElement('div');
+                thumb.className = `sticker-thumb clickable bg-${previewBg}`;
+
+                const frameBadge = document.createElement('span');
+                frameBadge.className = 'seq-frame-badge';
+                frameBadge.textContent = `#${idx + 1}`;
+                thumb.appendChild(frameBadge);
+
+                const removeBtn = document.createElement('button');
+                removeBtn.type = 'button';
+                removeBtn.className = 'card-remove';
+                removeBtn.setAttribute('aria-label', `Remove ${item.file.name}`);
+                removeBtn.textContent = '✕';
+                removeBtn.addEventListener('click', () => {
+                    URL.revokeObjectURL(item.url);
+                    seqFrames.splice(idx, 1);
+                    renderSeqGrid();
+                });
+                thumb.appendChild(removeBtn);
+
+                const img = document.createElement('img');
+                img.src = item.url;
+                img.alt = item.file.name;
+                thumb.appendChild(img);
+
+                const meta = document.createElement('div');
+                meta.className = 'sticker-meta';
+
+                const nameEl = document.createElement('div');
+                nameEl.className = 'sticker-name';
+                nameEl.title = item.file.name;
+                nameEl.textContent = item.file.name;
+
+                const subEl = document.createElement('div');
+                subEl.className = 'sticker-sub';
+                const dimSpan = document.createElement('span');
+                dimSpan.textContent = formatBytes(item.file.size);
+                img.onload = () => {
+                    dimSpan.textContent = `${img.naturalWidth}×${img.naturalHeight}`;
+                };
+
+                const reorder = document.createElement('span');
+                reorder.className = 'seq-reorder';
+
+                const leftBtn = document.createElement('button');
+                leftBtn.type = 'button';
+                leftBtn.className = 'seq-move-btn';
+                leftBtn.textContent = '←';
+                leftBtn.disabled = idx === 0;
+                leftBtn.addEventListener('click', () => {
+                    [seqFrames[idx - 1], seqFrames[idx]] = [seqFrames[idx], seqFrames[idx - 1]];
+                    renderSeqGrid();
+                });
+
+                const rightBtn = document.createElement('button');
+                rightBtn.type = 'button';
+                rightBtn.className = 'seq-move-btn';
+                rightBtn.textContent = '→';
+                rightBtn.disabled = idx === count - 1;
+                rightBtn.addEventListener('click', () => {
+                    [seqFrames[idx], seqFrames[idx + 1]] = [seqFrames[idx + 1], seqFrames[idx]];
+                    renderSeqGrid();
+                });
+
+                reorder.appendChild(leftBtn);
+                reorder.appendChild(rightBtn);
+                subEl.appendChild(dimSpan);
+                subEl.appendChild(reorder);
+                meta.appendChild(nameEl);
+                meta.appendChild(subEl);
+
+                thumb.addEventListener('click', (e) => {
+                    if (e.target.closest('.card-remove')) return;
+                    openLightbox({
+                        title: `Frame #${idx + 1} · ${item.file.name}`,
+                        subtitle: `${formatBytes(item.file.size)} · ${dimSpan.textContent}`,
+                        src: item.url,
+                        isVideo: false,
+                    });
+                });
+
+                card.appendChild(thumb);
+                card.appendChild(meta);
+                seqGrid.appendChild(card);
+            });
+        }
+
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach((eventName) => {
+            seqDropZone.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+            }, false);
+        });
+        ['dragenter', 'dragover'].forEach((eventName) => {
+            seqDropZone.addEventListener(eventName, () => seqDropZone.classList.add('dragover'), false);
+        });
+        ['dragleave', 'drop'].forEach((eventName) => {
+            seqDropZone.addEventListener(eventName, () => seqDropZone.classList.remove('dragover'), false);
+        });
+        seqDropZone.addEventListener('drop', (e) => {
+            if (e.dataTransfer.files.length > 0) addSeqFrames(e.dataTransfer.files);
+        });
+        seqDropZone.addEventListener('click', () => seqFileInput.click());
+        seqDropZone.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                seqFileInput.click();
+            }
+        });
+        seqFileInput.addEventListener('change', () => {
+            if (seqFileInput.files.length > 0) {
+                addSeqFrames(seqFileInput.files);
+                seqFileInput.value = '';
+            }
+        });
+
+        seqSortBtn.addEventListener('click', naturalSortFrames);
+        seqReverseBtn.addEventListener('click', () => {
+            seqFrames.reverse();
+            renderSeqGrid();
+        });
+        seqClearBtn.addEventListener('click', () => {
+            seqFrames.forEach((f) => URL.revokeObjectURL(f.url));
+            seqFrames = [];
+            apngResultBox.style.display = 'none';
+            renderSeqGrid();
+        });
+
+        combineApngBtn.addEventListener('click', async () => {
+            if (seqFrames.length < 2) return;
+            combineApngBtn.disabled = true;
+            combineBtnText.textContent = 'Combining frames...';
+            combineSpinner.style.display = 'block';
+            statusMessage.style.display = 'none';
+
+            const fd = new FormData();
+            fd.append('fps', seqFpsInput.value || '12');
+            fd.append('loops', seqLoopsInput.value || '0');
+            fd.append('filename', seqNameInput.value.trim() || 'sticker_animated.png');
+            seqFrames.forEach((item) => fd.append('frames', item.file));
+
+            try {
+                const res = await fetch('/combine-apng', { method: 'POST', body: fd });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || 'Combine failed');
+
+                lastCombinedApng = data;
+                apngResultThumb.innerHTML = '';
+                apngResultThumb.className = `sticker-thumb apng-result-preview clickable bg-${previewBg}`;
+                const img = document.createElement('img');
+                img.src = `${data.previewUrl}?t=${Date.now()}`;
+                img.alt = data.filename;
+                apngResultThumb.appendChild(img);
+                apngResultThumb.onclick = () => openLightbox({
+                    title: data.filename,
+                    subtitle: `${data.width}×${data.height} · ${data.frames} frames · ${data.fps} FPS · ${formatBytes(data.size)}`,
+                    src: img.src,
+                    isVideo: false,
+                    downloadUrl: data.downloadUrl,
+                });
+
+                apngResultName.textContent = data.filename;
+                apngResultMeta.textContent = `${data.width}×${data.height} · ${data.frames} frames · ${data.duration}s @ ${data.fps} FPS · ${formatBytes(data.size)}`;
+                apngDownloadLink.href = data.downloadUrl;
+                apngDownloadLink.download = data.filename;
+                apngResultBox.style.display = 'flex';
+                showStatus(`Combined ${data.frames} frames into ${data.filename} (${formatBytes(data.size)}).`, 'success');
+            } catch (err) {
+                showStatus(`Error: ${err.message}`, 'error');
+            } finally {
+                combineApngBtn.disabled = seqFrames.length < 2;
+                combineBtnText.textContent = `Combine ${seqFrames.length} Frames into APNG`;
+                combineSpinner.style.display = 'none';
+            }
+        });
+
+        sendApngToConverterBtn.addEventListener('click', async () => {
+            if (!lastCombinedApng) return;
+            sendApngToConverterBtn.disabled = true;
+            sendApngToConverterBtn.textContent = 'Sending...';
+            try {
+                const res = await fetch(lastCombinedApng.previewUrl);
+                if (!res.ok) throw new Error('Failed to load combined APNG');
+                const blob = await res.blob();
+                const apngFile = new File([blob], lastCombinedApng.filename, { type: 'image/png' });
+                addFiles([apngFile]);
+                switchWorkspaceMode('converter');
+                showStatus(`Added ${lastCombinedApng.filename} to the converter queue. Click "Convert" whenever ready!`, 'success');
+            } catch (err) {
+                showStatus(`Error: ${err.message}`, 'error');
+            } finally {
+                sendApngToConverterBtn.disabled = false;
+                sendApngToConverterBtn.textContent = 'Send to Converter →';
             }
         });
 
