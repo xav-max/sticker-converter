@@ -45,6 +45,16 @@ function getUniquePath(dir, filename) {
 
 function buildManifest(sessionId, outputDir) {
     const manifest = {};
+    const belowFloorSet = new Set();
+    const belowFloorPath = path.join(outputDir, '.below_floor');
+    if (fs.existsSync(belowFloorPath)) {
+        fs.readFileSync(belowFloorPath, 'utf8')
+            .split('\n')
+            .map((l) => l.trim())
+            .filter(Boolean)
+            .forEach((rel) => belowFloorSet.add(rel));
+    }
+
     for (const platform of PLATFORMS) {
         const pDir = path.join(outputDir, platform);
         const files = [];
@@ -64,11 +74,13 @@ function buildManifest(sessionId, outputDir) {
                 }
 
                 const ext = path.extname(lower);
+                const belowFloor = belowFloorSet.has(`${platform}/${name}`);
                 files.push({
                     name,
                     size: stat.size,
                     limit,
-                    passed: limit ? stat.size <= limit : true,
+                    belowFloor,
+                    passed: (limit ? stat.size <= limit : true) && !belowFloor,
                     ext,
                     previewUrl: `/preview/${sessionId}/${platform}/${encodeURIComponent(name)}`,
                     downloadUrl: `/preview/${sessionId}/${platform}/${encodeURIComponent(name)}?download=1`,

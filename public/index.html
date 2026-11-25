@@ -123,6 +123,7 @@
                                         <button type="button" class="bg-switch-btn active" data-bg="transparent"><span class="bg-swatch transparent"></span>Transparent</button>
                                         <button type="button" class="bg-switch-btn" data-bg="black"><span class="bg-swatch black"></span>Black</button>
                                         <button type="button" class="bg-switch-btn" data-bg="white"><span class="bg-swatch white"></span>White</button>
+                                        <button type="button" class="bg-switch-btn" data-bg="green"><span class="bg-swatch green"></span>Green</button>
                                     </div>
                                     <button type="button" id="clearAllBtn" class="ghost-btn">Clear all</button>
                                 </div>
@@ -186,6 +187,7 @@
                         <button type="button" class="bg-switch-btn active" data-bg="transparent"><span class="bg-swatch transparent"></span>Transparent</button>
                         <button type="button" class="bg-switch-btn" data-bg="black"><span class="bg-swatch black"></span>Black</button>
                         <button type="button" class="bg-switch-btn" data-bg="white"><span class="bg-swatch white"></span>White</button>
+                        <button type="button" class="bg-switch-btn" data-bg="green"><span class="bg-swatch green"></span>Green</button>
                     </div>
                 </div>
 
@@ -220,6 +222,7 @@
                     <button type="button" class="bg-switch-btn active" data-bg="transparent"><span class="bg-swatch transparent"></span>Transparent</button>
                     <button type="button" class="bg-switch-btn" data-bg="black"><span class="bg-swatch black"></span>Black</button>
                     <button type="button" class="bg-switch-btn" data-bg="white"><span class="bg-swatch white"></span>White</button>
+                    <button type="button" class="bg-switch-btn" data-bg="green"><span class="bg-swatch green"></span>Green</button>
                 </div>
                 <a id="lightboxDownloadBtn" class="dl-btn primary" href="#" style="display: none;">Download sticker</a>
             </div>
@@ -339,7 +342,7 @@
                 btn.classList.toggle('active', btn.dataset.bg === bg);
             });
             document.querySelectorAll('.sticker-thumb, #lightboxStage').forEach((el) => {
-                el.classList.remove('bg-transparent', 'bg-black', 'bg-white');
+                el.classList.remove('bg-transparent', 'bg-black', 'bg-white', 'bg-green');
                 el.classList.add(`bg-${bg}`);
             });
         }
@@ -786,6 +789,9 @@
                     const statusPill = document.createElement('span');
                     statusPill.className = `size-pill ${file.passed ? 'pass' : 'warn'}`;
                     statusPill.textContent = file.passed ? 'PASS' : 'OVER';
+                    if (file.belowFloor) {
+                        statusPill.title = 'Fits under file size limit, but compressed below preferred color/FPS floor';
+                    }
 
                     subEl.appendChild(sizeText);
                     subEl.appendChild(statusPill);

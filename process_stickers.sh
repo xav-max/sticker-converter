@@ -11,6 +11,15 @@ WHATSAPP_FORMAT="${WHATSAPP_FORMAT:-webp}"
 
 mkdir -p "$PROCESSED_DIR" "$OUTPUT_DIR/whatsapp" "$OUTPUT_DIR/wechat" "$OUTPUT_DIR/telegram" "$OUTPUT_DIR/signal" "$OUTPUT_DIR/line"
 
+BELOW_FLOOR_FILE="$OUTPUT_DIR/.below_floor"
+: > "$BELOW_FLOOR_FILE"
+
+mark_below_floor() {
+  local out_path="$1"
+  local rel="${out_path#"$OUTPUT_DIR"/}"
+  echo "$rel" >> "$BELOW_FLOOR_FILE"
+}
+
 HAS_GIFSICLE=0
 HAS_PNGQUANT=0
 HAS_APNGASM=0
@@ -330,6 +339,24 @@ optimize_webp() {
     fi
   done
 
+  # Emergency fit (below quality floor so file is never over max_size)
+  local emerg_webp=("85:4:22" "85:3:14" "85:2:10" "70:2:8")
+  for cfg in "${emerg_webp[@]}"; do
+    local pct fps q
+    IFS=':' read -r pct fps q <<< "$cfg"
+    local sf
+    sf=$(build_scale_filter 512 512 "$pct" 1)
+    ffmpeg -nostdin -y -v error -i "$src" -vf "fps=${fps},${sf}" \
+      -c:v libwebp_anim -lossless 0 -q:v "$q" -loop 0 -preset default -an "$out"
+    local s
+    s=$(get_filesize "$out")
+    if [ "$s" -gt 0 ] && [ "$s" -le "$max_size" ]; then
+      mark_below_floor "$out"
+      echo "[$label] Fitted below quality floor (scale=${pct}%, ${fps} FPS, q=${q}): $s / $max_size bytes."
+      return 0
+    fi
+  done
+
   echo "[$label] WARNING: Could not shrink WebP below $max_size bytes."
   return 1
 }
@@ -439,6 +466,37 @@ optimize_gif() {
     return 0
   fi
 
+  # Emergency fit (below quality floor: reduce colors/FPS so output never exceeds max_size)
+  local emerg_gif=(
+    "${min_scale_pct}:48:${fps_min}:none:1"
+    "${min_scale_pct}:32:${fps_min}:none:1"
+    "${min_scale_pct}:32:3:none:1"
+    "${min_scale_pct}:24:3:none:1"
+    "${min_scale_pct}:16:2:none:1"
+    "${min_scale_pct}:8:2:none:1"
+    "55:16:2:none:1"
+    "40:16:2:none:1"
+  )
+  for cfg in "${emerg_gif[@]}"; do
+    local pct c f d st
+    IFS=':' read -r pct c f d st <<< "$cfg"
+    if [ "$f" -gt "$fps_max" ]; then f="$fps_max"; fi
+    render_gif_candidate "$src" "$raw_gif" "$canvas_w" "$canvas_h" "$pad_canvas" "$pct" "$f" "$c" "$d" "$st"
+    if [ "$HAS_GIFSICLE" -eq 1 ]; then
+      gifsicle -O3 --lossy=120 "$raw_gif" -o "$cand_gif" 2>/dev/null || cp "$raw_gif" "$cand_gif"
+    else
+      cp "$raw_gif" "$cand_gif"
+    fi
+    local s
+    s=$(get_filesize "$cand_gif")
+    if [ "$s" -gt 0 ] && [ "$s" -le "$max_size" ]; then
+      cp "$cand_gif" "$out"
+      mark_below_floor "$out"
+      echo "[$label] Fitted below quality floor ($cfg): $s / $max_size bytes."
+      return 0
+    fi
+  done
+
   cp "$cand_gif" "$out" 2>/dev/null || true
   local final_s
   final_s=$(get_filesize "$out")
@@ -528,6 +586,59 @@ optimize_apng() {
     return 0
   fi
 
+  # Emergency fit (below quality floor: reduce colors/FPS so output never exceeds max_size)
+  local emerg_apng=()
+  while IFS= read -r line; do
+    emerg_apng+=("$line")
+  done < <(awk -v mscale="$min_scale_pct" -v fmax="$fps_max" -v fmin="$fps_min" \
+      -v tmin="$tmin" -v tmax="$tmax" -v dint="$dur_int" '
+  function clamp_efps(f,    tot) {
+    if (f > fmax) f = fmax;
+    if (dint > 0 && tmax > 0) {
+      tot = f * dint;
+      if (tot > tmax) f = int(tmax / dint);
+      if (tot < tmin) f = int((tmin + dint - 1) / dint);
+    }
+    if (f < 1) f = 1;
+    return f;
+  }
+  BEGIN {
+    s[0]=mscale; c[0]=48; f[0]=fmin;
+    s[1]=mscale; c[1]=32; f[1]=fmin;
+    s[2]=mscale; c[2]=32; f[2]=3;
+    s[3]=mscale; c[3]=24; f[3]=3;
+    s[4]=mscale; c[4]=16; f[4]=2;
+    s[5]=mscale; c[5]=8;  f[5]=2;
+    s[6]=55;     c[6]=16; f[6]=2;
+    s[7]=40;     c[7]=16; f[7]=2;
+    prev="";
+    for (i = 0; i < 8; i++) {
+      fps = clamp_efps(f[i]);
+      sc = s[i];
+      entry = sc ":" c[i] ":" fps ":none:1";
+      if (entry != prev) { print entry; prev = entry; }
+    }
+  }')
+
+  for cfg in "${emerg_apng[@]}"; do
+    local pct c f d st
+    IFS=':' read -r pct c f d st <<< "$cfg"
+    rm -f "$cand_png"
+    render_apng_candidate "$src" "$cand_png" "$canvas_w" "$canvas_h" "$pad_canvas" "$pct" "$f" "$c" "$d" "$max_dur" "$plays" "$fdir" "$st"
+    local s
+    s=$(get_filesize "$cand_png")
+    if [ "$s" -gt 0 ] && { [ "$smallest_size" -eq 0 ] || [ "$s" -lt "$smallest_size" ]; }; then
+      cp "$cand_png" "$smallest_png"
+      smallest_size="$s"
+    fi
+    if [ "$s" -gt 0 ] && [ "$s" -le "$max_size" ]; then
+      cp "$cand_png" "$out"
+      mark_below_floor "$out"
+      echo "[$label] Fitted below quality floor ($cfg): $s / $max_size bytes."
+      return 0
+    fi
+  done
+
   if [ -s "$smallest_png" ]; then
     cp "$smallest_png" "$out"
   fi
@@ -588,6 +699,30 @@ optimize_webm() {
     fsize=$(get_filesize "$out")
     if [ "$fsize" -gt 0 ] && [ "$fsize" -le "$max_size" ]; then
       echo "[$label] Passed (2-pass VP9, ${kbps}k, ${fps} FPS, try #$attempt_num): $fsize / $max_size bytes."
+      return 0
+    fi
+  done
+
+  # Emergency WebM fit (below quality floor)
+  local emerg_webm=("80:10" "50:8" "35:5")
+  for cfg in "${emerg_webm[@]}"; do
+    local kbps fps
+    IFS=':' read -r kbps fps <<< "$cfg"
+    if [ "$fps" -gt "$fps_max" ]; then fps="$fps_max"; fi
+    rm -f "${passlog}"*
+    ffmpeg -nostdin -y -v error -i "$src" -vf "fps=${fps}" \
+      -c:v libvpx-vp9 -pix_fmt yuva420p -auto-alt-ref 0 \
+      -deadline good -cpu-used 2 -row-mt 1 -b:v "${kbps}k" \
+      -pass 1 -passlogfile "$passlog" -t 3 -an -f webm /dev/null
+    ffmpeg -nostdin -y -v error -i "$src" -vf "fps=${fps}" \
+      -c:v libvpx-vp9 -pix_fmt yuva420p -auto-alt-ref 0 \
+      -deadline good -cpu-used 2 -row-mt 1 -b:v "${kbps}k" \
+      -pass 2 -passlogfile "$passlog" -t 3 -an "$out"
+    local fsize
+    fsize=$(get_filesize "$out")
+    if [ "$fsize" -gt 0 ] && [ "$fsize" -le "$max_size" ]; then
+      mark_below_floor "$out"
+      echo "[$label] Fitted below quality floor (VP9 ${kbps}k, ${fps} FPS): $fsize / $max_size bytes."
       return 0
     fi
   done
