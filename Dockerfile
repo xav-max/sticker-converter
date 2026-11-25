@@ -1,8 +1,8 @@
 # Use a lightweight Alpine Linux base image
 FROM alpine:latest
 
-# Install FFmpeg, Bash, Node.js, and NPM
-RUN apk add --no-cache bash ffmpeg coreutils nodejs npm
+# Install FFmpeg, Bash, Node.js, NPM, Gifsicle, and pngquant
+RUN apk add --no-cache bash ffmpeg coreutils nodejs npm gifsicle pngquant
 
 # Set the working directory inside the container
 WORKDIR /app

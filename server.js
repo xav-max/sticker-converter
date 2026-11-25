@@ -13,76 +13,184 @@ app.use(express.static('public'));
 const upload = multer({ dest: '/tmp/uploads/' });
 const activeSessions = {};
 
-// 1. UPLOAD ENDPOINT
-app.post('/upload', upload.single('stickerZip'), async (req, res) => {
-    if (!req.file) return res.status(400).json({ error: 'No file uploaded.' });
+const PLATFORMS = ['whatsapp', 'wechat', 'telegram', 'signal', 'line'];
+const PLATFORM_LIMITS = {
+    whatsapp: 500 * 1024,
+    wechat: 500 * 1024,
+    telegram: 256 * 1024,
+    signal: 300 * 1024,
+    line: 300 * 1024,
+};
+const STATIC_SPECIALS = new Set(['tab.png', 'cover.png', 'icon.png']);
+const SESSION_TTL_MS = 30 * 60 * 1000;
 
-    const sessionId = Date.now().toString();
-    const uploadedZipPath = req.file.path;
-    const extractDir = path.join('/tmp/processing', sessionId, 'input');
-    const outputDir = path.join('/tmp/processing', sessionId, 'output');
+function sanitizeFilename(rawName) {
+    const decoded = Buffer.from(rawName || 'sticker', 'latin1').toString('utf8');
+    const base = path.basename(decoded).replace(/[\\/:*?"<>|\n\r]/g, '_');
+    return base || 'sticker.gif';
+}
 
-    activeSessions[sessionId] = { clients: [], events: [] };
+function getUniquePath(dir, filename) {
+    let target = path.join(dir, filename);
+    if (!fs.existsSync(target)) return target;
+    const ext = path.extname(filename);
+    const stem = path.basename(filename, ext);
+    let idx = 1;
+    while (fs.existsSync(target)) {
+        target = path.join(dir, `${stem}_${idx}${ext}`);
+        idx += 1;
+    }
+    return target;
+}
+
+function buildManifest(sessionId, outputDir) {
+    const manifest = {};
+    for (const platform of PLATFORMS) {
+        const pDir = path.join(outputDir, platform);
+        const files = [];
+        if (fs.existsSync(pDir)) {
+            const entries = fs.readdirSync(pDir).sort();
+            for (const name of entries) {
+                const fullPath = path.join(pDir, name);
+                const stat = fs.statSync(fullPath);
+                if (!stat.isFile()) continue;
+
+                const lower = name.toLowerCase();
+                let limit = PLATFORM_LIMITS[platform];
+                if (platform === 'line' && lower === 'main.png') {
+                    limit = 1000 * 1024;
+                } else if (STATIC_SPECIALS.has(lower)) {
+                    limit = null;
+                }
+
+                const ext = path.extname(lower);
+                files.push({
+                    name,
+                    size: stat.size,
+                    limit,
+                    passed: limit ? stat.size <= limit : true,
+                    ext,
+                    previewUrl: `/preview/${sessionId}/${platform}/${encodeURIComponent(name)}`,
+                    downloadUrl: `/preview/${sessionId}/${platform}/${encodeURIComponent(name)}?download=1`,
+                });
+            }
+        }
+        manifest[platform] = files;
+    }
+    return manifest;
+}
+
+function cleanupSession(sessionId) {
+    try {
+        fs.rmSync(path.join('/tmp/processing', sessionId), { recursive: true, force: true });
+    } catch (err) {
+        console.error(`Cleanup error for session ${sessionId}:`, err);
+    }
+    delete activeSessions[sessionId];
+}
+
+setInterval(() => {
+    const now = Date.now();
+    for (const [sessionId, session] of Object.entries(activeSessions)) {
+        if (now - session.lastAccessedAt > SESSION_TTL_MS) {
+            cleanupSession(sessionId);
+        }
+    }
+}, 5 * 60 * 1000).unref();
+
+// 1. MULTI-FILE & ZIP UPLOAD ENDPOINT
+app.post('/upload', upload.any(), async (req, res) => {
+    const uploadedFiles = req.files || [];
+    if (uploadedFiles.length === 0) {
+        return res.status(400).json({ error: 'No files uploaded.' });
+    }
+
+    const sessionId = `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    const sessionDir = path.join('/tmp/processing', sessionId);
+    const extractDir = path.join(sessionDir, 'input');
+    const outputDir = path.join(sessionDir, 'output');
+    const zipCacheDir = path.join(sessionDir, 'zips');
+    const startedAt = Date.now();
+
+    activeSessions[sessionId] = {
+        clients: [],
+        events: [],
+        outputDir,
+        zipCacheDir,
+        lastAccessedAt: Date.now(),
+        manifest: null,
+    };
 
     try {
         fs.mkdirSync(extractDir, { recursive: true });
         fs.mkdirSync(outputDir, { recursive: true });
+        fs.mkdirSync(zipCacheDir, { recursive: true });
 
-        const originalName = path.basename(Buffer.from(req.file.originalname || '', 'latin1').toString('utf8'));
-        if (/\.(gif|png)$/i.test(originalName)) {
-            // Single image: place it directly in the input folder
-            fs.copyFileSync(uploadedZipPath, path.join(extractDir, originalName.replace(/[\\/:*?"<>|\n\r]/g, '_')));
-        } else {
-            const zip = new AdmZip(uploadedZipPath);
-            zip.extractAllTo(extractDir, true);
+        for (const file of uploadedFiles) {
+            const safeName = sanitizeFilename(file.originalname);
+            if (/\.(gif|png)$/i.test(safeName)) {
+                const destPath = getUniquePath(extractDir, safeName);
+                fs.copyFileSync(file.path, destPath);
+            } else if (/\.zip$/i.test(safeName)) {
+                const zip = new AdmZip(file.path);
+                zip.extractAllTo(extractDir, true);
+            }
+            fs.unlinkSync(file.path);
         }
-        fs.unlinkSync(uploadedZipPath);
 
-        // Start processing asynchronously
         const scriptPath = path.join(__dirname, 'process_stickers.sh');
         const processStickers = spawn('bash', [scriptPath, extractDir, outputDir]);
 
         const broadcast = (data) => {
-            if (activeSessions[sessionId]) {
-                activeSessions[sessionId].events.push(data);
-                activeSessions[sessionId].clients.forEach(clientRes => {
-                    clientRes.write(`data: ${JSON.stringify(data)}\n\n`);
-                });
-            }
+            const session = activeSessions[sessionId];
+            if (!session) return;
+            session.events.push(data);
+            session.clients.forEach((clientRes) => {
+                clientRes.write(`data: ${JSON.stringify(data)}\n\n`);
+            });
         };
 
         processStickers.stdout.on('data', (data) => {
-            const lines = data.toString().split('\n').filter(l => l.trim());
-            lines.forEach(line => broadcast({ type: 'log', message: line }));
+            const lines = data.toString().split('\n').filter((l) => l.trim());
+            lines.forEach((line) => broadcast({ type: 'log', message: line }));
         });
 
         processStickers.stderr.on('data', (data) => {
-            // FFmpeg logs to stderr natively, so we treat it as standard logs for the UI
-            const lines = data.toString().split('\n').filter(l => l.trim());
-            lines.forEach(line => broadcast({ type: 'log', message: line }));
+            const lines = data.toString().split('\n').filter((l) => l.trim());
+            lines.forEach((line) => broadcast({ type: 'log', message: line }));
         });
 
         processStickers.on('close', (code) => {
+            const session = activeSessions[sessionId];
+            if (!session) return;
+            session.lastAccessedAt = Date.now();
+
             if (code === 0) {
                 try {
-                    const outputZipPath = path.join('/tmp', `optimized_stickers_${sessionId}.zip`);
-                    const outputZip = new AdmZip();
-                    outputZip.addLocalFolder(outputDir);
-                    outputZip.writeZip(outputZipPath);
-
-                    broadcast({ type: 'done', url: `/download/${sessionId}` });
+                    const manifest = buildManifest(sessionId, outputDir);
+                    session.manifest = manifest;
+                    const elapsedMs = Date.now() - startedAt;
+                    broadcast({
+                        type: 'done',
+                        sessionId,
+                        elapsedMs,
+                        manifest,
+                        downloadAllUrl: `/download/${sessionId}/all`,
+                    });
                 } catch (e) {
-                    broadcast({ type: 'error', message: `Zipping failed: ${e.message}` });
+                    broadcast({ type: 'error', message: `Manifest generation failed: ${e.message}` });
                 }
             } else {
                 broadcast({ type: 'error', message: `Process exited with code ${code}` });
             }
         });
 
-        // Respond immediately so frontend can open SSE connection
         res.json({ sessionId });
-
     } catch (err) {
+        uploadedFiles.forEach((f) => {
+            if (fs.existsSync(f.path)) fs.unlinkSync(f.path);
+        });
+        cleanupSession(sessionId);
         console.error(err);
         res.status(500).json({ error: 'Internal server error during upload.' });
     }
@@ -91,45 +199,112 @@ app.post('/upload', upload.single('stickerZip'), async (req, res) => {
 // 2. LOGS ENDPOINT (Server-Sent Events)
 app.get('/logs/:sessionId', (req, res) => {
     const { sessionId } = req.params;
-    if (!activeSessions[sessionId]) return res.status(404).send('Session not found');
+    const session = activeSessions[sessionId];
+    if (!session) return res.status(404).send('Session not found');
 
+    session.lastAccessedAt = Date.now();
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
 
-    // Send an initial connected message so the client stream starts
-    res.write(`data: ${JSON.stringify({ type: 'log', message: 'Connected to log stream...' })}\n\n`);
-
-    // Replay anything emitted before this client connected (fast single-file runs)
-    activeSessions[sessionId].events.forEach(evt => res.write(`data: ${JSON.stringify(evt)}\n\n`));
-    activeSessions[sessionId].clients.push(res);
+    res.write(`data: ${JSON.stringify({ type: 'log', message: 'Connected to fast conversion stream...' })}\n\n`);
+    session.events.forEach((evt) => res.write(`data: ${JSON.stringify(evt)}\n\n`));
+    session.clients.push(res);
 
     req.on('close', () => {
         if (activeSessions[sessionId]) {
-            activeSessions[sessionId].clients = activeSessions[sessionId].clients.filter(c => c !== res);
+            activeSessions[sessionId].clients = activeSessions[sessionId].clients.filter((c) => c !== res);
         }
     });
 });
 
-// 3. DOWNLOAD ENDPOINT
-app.get('/download/:sessionId', (req, res) => {
-    const { sessionId } = req.params;
-    const outputZipPath = path.join('/tmp', `optimized_stickers_${sessionId}.zip`);
-    
-    if (!fs.existsSync(outputZipPath)) {
+// 3. INLINE PREVIEW & SINGLE-FILE DOWNLOAD ENDPOINT
+app.get('/preview/:sessionId/:platform/:filename', (req, res) => {
+    const { sessionId, platform, filename } = req.params;
+    const session = activeSessions[sessionId];
+    if (!session || !PLATFORMS.includes(platform)) {
+        return res.status(404).send('Not found');
+    }
+
+    const safeFile = path.basename(filename);
+    const filePath = path.join(session.outputDir, platform, safeFile);
+    if (!fs.existsSync(filePath)) {
         return res.status(404).send('File not found');
     }
 
-    res.download(outputZipPath, 'Optimized_Stickers.zip', (err) => {
-        // Cleanup after download
-        try {
-            fs.rmSync(path.join('/tmp/processing', sessionId), { recursive: true, force: true });
-            fs.unlinkSync(outputZipPath);
-            delete activeSessions[sessionId];
-        } catch (cleanupErr) {
-            console.error('Cleanup error:', cleanupErr);
+    session.lastAccessedAt = Date.now();
+    if (req.query.download === '1') {
+        return res.download(filePath, safeFile);
+    }
+
+    const ext = path.extname(safeFile).toLowerCase();
+    const mime =
+        ext === '.gif' ? 'image/gif' :
+        ext === '.png' ? 'image/png' :
+        ext === '.webm' ? 'video/webm' : 'application/octet-stream';
+    res.setHeader('Content-Type', mime);
+    res.setHeader('Cache-Control', 'no-store');
+    res.sendFile(filePath);
+});
+
+// 4. SINGLE-PLATFORM ZIP DOWNLOAD ENDPOINT
+app.get('/download/:sessionId/platform/:platform', (req, res) => {
+    const { sessionId, platform } = req.params;
+    const session = activeSessions[sessionId];
+    if (!session || !PLATFORMS.includes(platform)) {
+        return res.status(404).send('Session or platform not found');
+    }
+
+    const pDir = path.join(session.outputDir, platform);
+    if (!fs.existsSync(pDir) || fs.readdirSync(pDir).length === 0) {
+        return res.status(404).send('No files for this platform');
+    }
+
+    session.lastAccessedAt = Date.now();
+    const zipPath = path.join(session.zipCacheDir, `${platform}_stickers.zip`);
+    if (!fs.existsSync(zipPath)) {
+        const zip = new AdmZip();
+        zip.addLocalFolder(pDir);
+        zip.writeZip(zipPath);
+    }
+
+    res.download(zipPath, `Stickers_${platform}.zip`);
+});
+
+// 5. ALL-PLATFORMS BATCH ZIP DOWNLOAD ENDPOINT (plus backward-compatible alias)
+function handleDownloadAll(req, res) {
+    const { sessionId } = req.params;
+    const session = activeSessions[sessionId];
+    if (!session || !fs.existsSync(session.outputDir)) {
+        return res.status(404).send('Session not found');
+    }
+
+    session.lastAccessedAt = Date.now();
+    const zipPath = path.join(session.zipCacheDir, 'all_platforms.zip');
+    if (!fs.existsSync(zipPath)) {
+        const zip = new AdmZip();
+        for (const platform of PLATFORMS) {
+            const pDir = path.join(session.outputDir, platform);
+            if (fs.existsSync(pDir) && fs.readdirSync(pDir).length > 0) {
+                zip.addLocalFolder(pDir, platform);
+            }
         }
-    });
+        zip.writeZip(zipPath);
+    }
+
+    res.download(zipPath, 'Optimized_Stickers_All_Platforms.zip');
+}
+
+app.get('/download/:sessionId/all', handleDownloadAll);
+app.get('/download/:sessionId', handleDownloadAll);
+
+// 6. OPTIONAL SESSION CLEANUP ENDPOINT
+app.delete('/session/:sessionId', (req, res) => {
+    const { sessionId } = req.params;
+    if (activeSessions[sessionId]) {
+        cleanupSession(sessionId);
+    }
+    res.json({ ok: true });
 });
 
 app.listen(port, () => console.log(`Server listening on port ${port}`));

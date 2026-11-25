@@ -602,6 +602,377 @@ summary:focus-visible {
 .log-processing { color: #7caeff; font-weight: 600; }
 .log-default { color: #91a2b8; }
 
+/* Multi-sticker staging & preview grid */
+.drop-zone.compact {
+    min-height: 112px;
+    padding: 18px 20px;
+}
+
+.drop-zone.compact .upload-icon {
+    width: 38px;
+    height: 38px;
+    margin-bottom: 8px;
+    border-radius: 10px;
+}
+
+.drop-zone.compact .upload-icon svg {
+    width: 19px;
+    height: 19px;
+}
+
+.drop-zone.compact h3 {
+    font-size: 14px;
+}
+
+.drop-zone.compact p,
+.drop-zone.compact .drop-hint {
+    display: none;
+}
+
+.staging-header,
+.results-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: 18px;
+    margin-bottom: 12px;
+}
+
+.staging-count {
+    color: var(--text);
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.staging-count span {
+    color: var(--muted);
+    font-weight: 400;
+}
+
+.ghost-btn {
+    padding: 6px 11px;
+    color: var(--muted);
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--line);
+    border-radius: 7px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 500;
+    transition: color 150ms ease, border-color 150ms ease, background 150ms ease;
+}
+
+.ghost-btn:hover {
+    color: var(--error);
+    border-color: rgba(255, 122, 133, 0.35);
+    background: rgba(255, 122, 133, 0.08);
+}
+
+.sticker-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(136px, 1fr));
+    gap: 12px;
+}
+
+.sticker-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: var(--surface-soft);
+    border: 1px solid var(--line);
+    border-radius: 11px;
+    transition: border-color 160ms ease, transform 160ms ease;
+}
+
+.sticker-card:hover {
+    border-color: rgba(124, 140, 255, 0.4);
+    transform: translateY(-1px);
+}
+
+.sticker-thumb {
+    position: relative;
+    display: grid;
+    aspect-ratio: 1 / 1;
+    place-items: center;
+    padding: 10px;
+    background-color: #0b1121;
+    background-image:
+        linear-gradient(45deg, rgba(255, 255, 255, 0.04) 25%, transparent 25%),
+        linear-gradient(-45deg, rgba(255, 255, 255, 0.04) 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, rgba(255, 255, 255, 0.04) 75%),
+        linear-gradient(-45deg, transparent 75%, rgba(255, 255, 255, 0.04) 75%);
+    background-size: 16px 16px;
+    background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+}
+
+.sticker-thumb img,
+.sticker-thumb video {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+}
+
+.sticker-zip-badge {
+    padding: 8px 12px;
+    color: var(--accent);
+    background: rgba(124, 140, 255, 0.12);
+    border: 1px solid rgba(124, 140, 255, 0.3);
+    border-radius: 8px;
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.card-remove {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    display: grid;
+    width: 24px;
+    height: 24px;
+    place-items: center;
+    color: #cbd5e1;
+    background: rgba(7, 10, 20, 0.78);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 12px;
+    line-height: 1;
+    transition: background 150ms ease, color 150ms ease;
+}
+
+.card-remove:hover {
+    color: #fff;
+    background: rgba(255, 100, 115, 0.88);
+}
+
+.card-special-pill {
+    position: absolute;
+    top: 6px;
+    left: 6px;
+    padding: 2px 6px;
+    color: #7dd3fc;
+    background: rgba(7, 10, 20, 0.82);
+    border: 1px solid rgba(79, 209, 255, 0.35);
+    border-radius: 5px;
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+    font-size: 9px;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.sticker-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding: 9px 10px 10px;
+    border-top: 1px solid var(--line);
+}
+
+.sticker-name {
+    overflow: hidden;
+    color: var(--text);
+    font-size: 12px;
+    font-weight: 500;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.sticker-sub {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    color: var(--muted);
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+    font-size: 10px;
+}
+
+/* Results & Download Center */
+.results-panel {
+    margin-top: 22px;
+    padding: 26px;
+}
+
+.results-title-group h2 {
+    margin: 0;
+    color: var(--text);
+    font-size: 18px;
+    font-weight: 650;
+}
+
+.results-title-group p {
+    margin: 4px 0 0;
+    color: var(--muted);
+    font-size: 13px;
+}
+
+.download-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    padding: 16px;
+    margin: 16px 0 18px;
+    background: var(--surface-soft);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+}
+
+.dl-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 14px;
+    color: var(--text);
+    background: var(--surface-raised);
+    border: 1px solid var(--line);
+    border-radius: 9px;
+    text-decoration: none;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: border-color 150ms ease, background 150ms ease, transform 150ms ease;
+}
+
+.dl-btn:hover {
+    border-color: rgba(124, 140, 255, 0.55);
+    background: rgba(124, 140, 255, 0.14);
+    transform: translateY(-1px);
+}
+
+.dl-btn svg {
+    width: 16px;
+    height: 16px;
+    flex: 0 0 auto;
+}
+
+.dl-btn.primary {
+    color: #fff;
+    background: linear-gradient(135deg, #5b6cff 0%, #7a5cff 55%, #3fb8ff 130%);
+    border: 1px solid rgba(160, 180, 255, 0.45);
+    box-shadow: 0 8px 22px -8px rgba(91, 108, 255, 0.75);
+}
+
+.dl-btn-meta {
+    color: var(--muted);
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+    font-size: 10px;
+    font-weight: 500;
+}
+
+.dl-btn.primary .dl-btn-meta {
+    color: rgba(255, 255, 255, 0.85);
+}
+
+.platform-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 16px;
+}
+
+.platform-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 7px 12px;
+    color: var(--muted);
+    background: rgba(255, 255, 255, 0.025);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 600;
+    transition: all 150ms ease;
+}
+
+.platform-tab svg {
+    width: 15px;
+    height: 15px;
+}
+
+.platform-tab:hover {
+    color: var(--text);
+    border-color: rgba(124, 140, 255, 0.4);
+}
+
+.platform-tab.active {
+    color: #fff;
+    background: rgba(124, 140, 255, 0.18);
+    border-color: var(--accent);
+}
+
+.results-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(175px, 1fr));
+    gap: 14px;
+}
+
+.result-platform-badge {
+    position: absolute;
+    top: 7px;
+    left: 7px;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 7px;
+    color: var(--text);
+    background: rgba(7, 10, 20, 0.82);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 6px;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.result-platform-badge svg {
+    width: 12px;
+    height: 12px;
+}
+
+.result-dl-icon {
+    position: absolute;
+    top: 7px;
+    right: 7px;
+    display: grid;
+    width: 26px;
+    height: 26px;
+    place-items: center;
+    color: #e2e8f0;
+    background: rgba(7, 10, 20, 0.82);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 6px;
+    text-decoration: none;
+    font-size: 13px;
+    transition: background 150ms ease, border-color 150ms ease;
+}
+
+.result-dl-icon:hover {
+    color: #fff;
+    background: var(--accent-strong);
+    border-color: var(--accent);
+}
+
+.size-pill {
+    padding: 1px 5px;
+    border-radius: 4px;
+    font-size: 9px;
+    font-weight: 700;
+}
+
+.size-pill.pass {
+    color: var(--success);
+    background: rgba(84, 214, 160, 0.12);
+}
+
+.size-pill.warn {
+    color: #efc36b;
+    background: rgba(239, 195, 107, 0.14);
+}
+
 @media (max-width: 760px) {
     body {
         padding: 22px 16px 40px;

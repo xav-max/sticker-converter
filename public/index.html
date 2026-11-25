@@ -5,157 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sticker Converter Pro</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <style>
-        .log-container {
-            margin-top: 15px;
-            background: #1e293b;
-            color: #cbd5e1;
-            padding: 20px;
-            border-radius: 12px;
-            font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
-            font-size: 13px;
-            line-height: 1.5;
-            height: 350px;
-            overflow-y: scroll;
-            display: none;
-            text-align: left;
-            border: 1px solid rgba(255,255,255,0.05);
-            box-shadow: inset 0 2px 10px rgba(0,0,0,0.2);
-        }
-        .log-header {
-            display: none;
-            justify-content: space-between;
-            align-items: center;
-            margin-top: 30px;
-        }
-        .log-header h3 {
-            margin: 0;
-            font-size: 16px;
-            color: #f8fafc;
-            font-weight: 600;
-        }
-        .export-btn {
-            background: #334155;
-            color: #f8fafc;
-            border: 1px solid #475569;
-            padding: 8px 16px;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 13px;
-            font-weight: 600;
-            transition: all 0.2s;
-        }
-        .export-btn:hover {
-            background: #475569;
-            border-color: #64748b;
-        }
-        
-        .log-success { color: #34d399; }
-        .log-error { color: #f87171; font-weight: bold; }
-        .log-warning { color: #fbbf24; }
-        .log-processing { color: #38bdf8; font-weight: bold; }
-        .log-default { color: #94a3b8; }
-
-        .special-files-notice {
-            background: rgba(56, 189, 248, 0.08);
-            border: 1px solid rgba(56, 189, 248, 0.2);
-            border-left: 4px solid #38bdf8;
-            padding: 20px 24px;
-            margin-top: 24px;
-            border-radius: 12px;
-            text-align: left;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-        }
-        
-        .special-files-notice h4 {
-            color: #e0f2fe;
-            margin: 0 0 12px 0;
-            font-size: 18px;
-            font-weight: 700;
-            letter-spacing: 0.5px;
-            text-transform: uppercase;
-        }
-
-        .special-files-notice ul {
-            margin: 0;
-            padding-left: 20px;
-            color: #bae6fd;
-            font-size: 16px;
-            line-height: 1.7;
-        }
-
-        .special-files-notice li {
-            margin-bottom: 8px;
-        }
-        
-        .special-files-notice li:last-child {
-            margin-bottom: 0;
-        }
-
-        .special-files-notice code {
-            background: rgba(15, 23, 42, 0.6);
-            padding: 3px 8px;
-            border-radius: 6px;
-            color: #38bdf8;
-            font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
-            font-weight: 600;
-            font-size: 15px;
-            border: 1px solid rgba(56, 189, 248, 0.1);
-        }
-        
-        .special-files-notice i {
-            color: #7dd3fc;
-            opacity: 0.8;
-            font-style: normal;
-        }
-
-        .platform-specs {
-            margin-top: 20px;
-            background: rgba(30, 41, 59, 0.5);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 12px;
-            text-align: left;
-            overflow: hidden;
-        }
-
-        .platform-specs summary {
-            padding: 16px 20px;
-            color: #f8fafc;
-            font-weight: 600;
-            font-size: 16px;
-            cursor: pointer;
-            user-select: none;
-            outline: none;
-            transition: background 0.2s;
-        }
-
-        .platform-specs summary:hover {
-            background: rgba(255, 255, 255, 0.05);
-        }
-
-        .platform-specs-content {
-            padding: 0 20px 20px 20px;
-            color: #cbd5e1;
-            font-size: 14px;
-            line-height: 1.6;
-        }
-        
-        .platform-specs-content h5 {
-            margin: 15px 0 5px 0;
-            color: #e2e8f0;
-            font-size: 15px;
-            font-weight: 600;
-        }
-
-        .platform-specs-content ul {
-            margin: 0;
-            padding-left: 20px;
-        }
-
-        .platform-specs-content li {
-            margin-bottom: 4px;
-        }
-    </style>
     <link rel="stylesheet" href="styles.css">
     <link rel="stylesheet" href="hero.css">
     <link rel="stylesheet" href="polish.css">
@@ -172,7 +21,7 @@
                 </span>
                 <span>STICKER CONVERTER <span style="color: var(--muted); font-weight: 500;">/ PRO</span></span>
             </div>
-            <div class="system-status"><span class="status-dot" aria-hidden="true"></span>Conversion engine ready</div>
+            <div class="system-status"><span class="status-dot" aria-hidden="true"></span>Fast pipeline ready</div>
         </nav>
 
         <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -195,10 +44,10 @@
             <div class="hero-copy">
                 <p class="eyebrow">Creative asset pipeline</p>
                 <h1 class="hero-title" aria-label="With one GIF sticker, create every compatible version for all other platforms."><span class="w" style="--d:0" aria-hidden="true">With</span> <span class="w glow" style="--d:1" aria-hidden="true">one</span> <span class="w glow" style="--d:2" aria-hidden="true">GIF</span> <span class="w glow" style="--d:3" aria-hidden="true">sticker,</span> <span class="w" style="--d:5" aria-hidden="true">create</span> <span class="w" style="--d:6" aria-hidden="true">every</span> <span class="w" style="--d:7" aria-hidden="true">compatible</span> <span class="w" style="--d:8" aria-hidden="true">version</span> <span class="w" style="--d:9" aria-hidden="true">for</span> <span class="w" style="--d:10" aria-hidden="true">all</span> <span class="w" style="--d:11" aria-hidden="true">other</span> <span class="w" style="--d:12" aria-hidden="true">platforms.</span></h1>
-                <p class="hero-sub">Drop in a single animated GIF and we automatically resize and convert it to fit each platform's format and size limits, ready to download in seconds.</p>
+                <p class="hero-sub">Drag and drop multiple stickers at once, preview every sticker live, and download a single platform or all platforms in batch.</p>
                 <div class="hero-actions">
                     <a class="hero-cta" href="#uploadHeading">Start converting <span aria-hidden="true">→</span></a>
-                    <span class="hero-meta"><b>7</b> platforms · <b>1</b> upload · <b>0</b> manual resizing</span>
+                    <span class="hero-meta"><b>Multi-drop</b> · <b>Live preview</b> · <b>Fast bisection</b></span>
                 </div>
             </div>
             <div class="hero-stage" aria-hidden="true">
@@ -245,34 +94,37 @@
                 <section class="panel upload-panel" aria-labelledby="uploadHeading">
                     <div class="panel-heading">
                         <div>
-                            <h2 id="uploadHeading">Upload your sticker pack</h2>
-                            <p>Start with a single GIF, or a ZIP archive of your source files.</p>
+                            <h2 id="uploadHeading">Drop your stickers</h2>
+                            <p>Drag multiple GIF / PNG files directly (no ZIP needed), preview all at once, then convert.</p>
                         </div>
                         <span class="step-index" aria-label="Step 1">01</span>
                     </div>
 
                     <form id="uploadForm" enctype="multipart/form-data">
-                        <div class="drop-zone" id="dropZone" role="button" tabindex="0" aria-label="Choose or drop a GIF or ZIP file">
+                        <div class="drop-zone" id="dropZone" role="button" tabindex="0" aria-label="Choose or drop sticker files">
                             <div class="drop-zone-content">
                                 <span class="upload-icon" aria-hidden="true">
                                     <svg viewBox="0 0 24 24" fill="none">
                                         <path d="M12 15V4m0 0L8 8m4-4 4 4M5 14v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
                                     </svg>
                                 </span>
-                                <h3>Drop your GIF or ZIP here</h3>
-                                <p>or click to browse files on your device</p>
-                                <span class="drop-hint">Single GIF / PNG, or a ZIP archive</span>
-                                <input type="file" name="stickerZip" id="fileInput" accept=".zip,.gif,.png" required hidden>
+                                <h3 id="dropTitle">Drop stickers here (multi-file)</h3>
+                                <p>or click to browse and select multiple GIF / PNG / ZIP files</p>
+                                <span class="drop-hint">Multi-file GIF / PNG, or ZIP archive</span>
+                                <input type="file" name="stickers" id="fileInput" accept=".zip,.gif,.png" multiple hidden>
                             </div>
                         </div>
 
-                        <div class="file-preview" id="filePreview" style="display: none;">
-                            <span id="fileName">No file selected</span>
-                            <button type="button" id="removeFile" aria-label="Remove selected file">✕</button>
+                        <div id="stagingWrapper" style="display: none;">
+                            <div class="staging-header">
+                                <div class="staging-count" id="stagingCount">0 stickers queued</div>
+                                <button type="button" id="clearAllBtn" class="ghost-btn">Clear all</button>
+                            </div>
+                            <div class="sticker-grid" id="stagingGrid"></div>
                         </div>
 
                         <button type="submit" id="convertBtn" class="convert-btn" disabled>
-                            <span class="btn-text">Convert & Download Stickers</span>
+                            <span class="btn-text">Convert Stickers</span>
                             <div class="spinner" id="spinner" style="display: none;"></div>
                         </button>
                     </form>
@@ -288,7 +140,7 @@
                 <aside class="panel side-panel">
                     <p class="section-label">Optional assets</p>
                     <h2>Platform-specific files</h2>
-                    <p class="side-intro">Use these exact filenames in your ZIP to generate interface and album assets alongside your stickers.</p>
+                    <p class="side-intro">Drop files with these exact names alongside your stickers to generate interface and album assets.</p>
 
                     <ul class="asset-list">
                         <li><code class="asset-code">main.gif</code><span class="asset-destination">LINE · Main image</span></li>
@@ -306,20 +158,20 @@
                             <ul>
                                 <li><strong>Format:</strong> GIF</li>
                                 <li><strong>Size:</strong> 512x512 pixels, ≤ 500 KB</li>
-                                <li><strong>Framerate & Duration:</strong> Original FPS, dynamic duration</li>
+                                <li><strong>Framerate & Duration:</strong> Original FPS, dynamic fit</li>
                             </ul>
 
                             <h5>LINE</h5>
                             <ul>
                                 <li><strong>Format:</strong> APNG</li>
-                                <li><strong>Size:</strong> 270x270 pixels (main.gif: 240x240, tab.png: 96x74), ≤ 1 MB</li>
+                                <li><strong>Size:</strong> 320x270 max (main.gif: 240x240, tab.png: 96x74), ≤ 300 KB (main ≤ 1 MB)</li>
                                 <li><strong>Framerate & Duration:</strong> 5-20 frames, strictly 1, 2, 3, or 4 seconds, loops within 4s max</li>
                             </ul>
 
                             <h5>Telegram</h5>
                             <ul>
-                                <li><strong>Format:</strong> WEBM</li>
-                                <li><strong>Size:</strong> 512x512 pixels, ≤ 256 KB</li>
+                                <li><strong>Format:</strong> WEBM (VP9 + Alpha)</li>
+                                <li><strong>Size:</strong> 512x512 max, ≤ 256 KB</li>
                                 <li><strong>Framerate & Duration:</strong> Max 30 FPS, max 3 seconds</li>
                             </ul>
 
@@ -343,7 +195,20 @@
 
             <div id="statusMessage" class="status-message"></div>
 
-            <details id="logWrapper" style="display: none;" open>
+            <section id="resultsPanel" class="panel results-panel" style="display: none;" aria-labelledby="resultsHeading">
+                <div class="results-header">
+                    <div class="results-title-group">
+                        <h2 id="resultsHeading">Converted stickers & downloads</h2>
+                        <p id="resultsSummary">Ready to preview and download.</p>
+                    </div>
+                </div>
+
+                <div class="download-bar" id="downloadBar"></div>
+                <div class="platform-tabs" id="platformTabs"></div>
+                <div class="results-grid" id="resultsGrid"></div>
+            </section>
+
+            <details id="logWrapper" class="panel" style="display: none;">
                 <summary>
                     <span>Live Processing Logs</span>
                     <button type="button" id="exportLogBtn" class="export-btn">Export log</button>
@@ -355,21 +220,182 @@
 
     <script>
         const dropZone = document.getElementById('dropZone');
+        const dropTitle = document.getElementById('dropTitle');
         const fileInput = document.getElementById('fileInput');
         const uploadForm = document.getElementById('uploadForm');
         const convertBtn = document.getElementById('convertBtn');
-        const filePreview = document.getElementById('filePreview');
-        const fileName = document.getElementById('fileName');
-        const removeFileBtn = document.getElementById('removeFile');
+        const stagingWrapper = document.getElementById('stagingWrapper');
+        const stagingCount = document.getElementById('stagingCount');
+        const stagingGrid = document.getElementById('stagingGrid');
+        const clearAllBtn = document.getElementById('clearAllBtn');
         const btnText = document.querySelector('.btn-text');
         const spinner = document.getElementById('spinner');
         const statusMessage = document.getElementById('statusMessage');
+        const resultsPanel = document.getElementById('resultsPanel');
+        const resultsSummary = document.getElementById('resultsSummary');
+        const downloadBar = document.getElementById('downloadBar');
+        const platformTabs = document.getElementById('platformTabs');
+        const resultsGrid = document.getElementById('resultsGrid');
         const logContainer = document.getElementById('logContainer');
         const logWrapper = document.getElementById('logWrapper');
         const exportLogBtn = document.getElementById('exportLogBtn');
 
+        const PLATFORM_META = {
+            whatsapp: { label: 'WhatsApp', logo: '#logo-whatsapp', ext: '.gif' },
+            wechat:   { label: 'WeChat',   logo: '#logo-wechat',   ext: '.gif' },
+            line:     { label: 'LINE',     logo: '#logo-line',     ext: '.png' },
+            telegram: { label: 'Telegram', logo: '#logo-telegram', ext: '.webm' },
+            signal:   { label: 'Signal',   logo: '#logo-signal',   ext: '.png' },
+        };
+        const SPECIAL_LABELS = {
+            'main.gif': 'LINE main',
+            'tab.png': 'LINE tab',
+            'tab.gif': 'LINE tab',
+            'cover.png': 'WeChat cover',
+            'cover.gif': 'WeChat cover',
+            'icon.png': 'WeChat icon',
+            'icon.gif': 'WeChat icon',
+        };
+
+        let queuedItems = []; // { id, file, url }
+        let nextItemId = 1;
         let eventSource = null;
         let fullLogs = [];
+        let currentSessionId = null;
+        let currentManifest = null;
+        let activeTab = 'all';
+
+        function formatBytes(bytes) {
+            if (bytes < 1024) return `${bytes} B`;
+            if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+            return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+        }
+
+        function showStatus(msg, type) {
+            statusMessage.textContent = msg;
+            statusMessage.className = `status-message ${type}`;
+            statusMessage.style.display = 'block';
+        }
+
+        function addFiles(fileList) {
+            let rejected = 0;
+            Array.from(fileList).forEach((file) => {
+                if (/\.(zip|gif|png)$/i.test(file.name)) {
+                    const url = /\.zip$/i.test(file.name) ? null : URL.createObjectURL(file);
+                    queuedItems.push({ id: nextItemId++, file, url });
+                } else {
+                    rejected += 1;
+                }
+            });
+            if (rejected > 0) {
+                showStatus(`Skipped ${rejected} unsupported file(s). Please drop .gif, .png, or .zip files.`, 'error');
+            } else {
+                statusMessage.style.display = 'none';
+            }
+            renderStagingGrid();
+        }
+
+        function removeQueuedItem(id) {
+            const idx = queuedItems.findIndex((item) => item.id === id);
+            if (idx === -1) return;
+            if (queuedItems[idx].url) URL.revokeObjectURL(queuedItems[idx].url);
+            queuedItems.splice(idx, 1);
+            renderStagingGrid();
+        }
+
+        function clearQueue() {
+            queuedItems.forEach((item) => {
+                if (item.url) URL.revokeObjectURL(item.url);
+            });
+            queuedItems = [];
+            fileInput.value = '';
+            renderStagingGrid();
+        }
+
+        function renderStagingGrid() {
+            stagingGrid.innerHTML = '';
+            const count = queuedItems.length;
+
+            if (count === 0) {
+                stagingWrapper.style.display = 'none';
+                dropZone.classList.remove('compact');
+                dropTitle.textContent = 'Drop stickers here (multi-file)';
+                convertBtn.disabled = true;
+                btnText.textContent = 'Convert Stickers';
+                return;
+            }
+
+            stagingWrapper.style.display = 'block';
+            dropZone.classList.add('compact');
+            dropTitle.textContent = '+ Drop or click to add more stickers';
+            convertBtn.disabled = false;
+
+            const totalBytes = queuedItems.reduce((sum, item) => sum + item.file.size, 0);
+            stagingCount.innerHTML = `${count} file${count > 1 ? 's' : ''} ready <span>(${formatBytes(totalBytes)} total)</span>`;
+            btnText.textContent = `Convert ${count} Sticker${count > 1 ? 's' : ''}`;
+
+            queuedItems.forEach((item) => {
+                const card = document.createElement('div');
+                card.className = 'sticker-card';
+
+                const thumb = document.createElement('div');
+                thumb.className = 'sticker-thumb';
+
+                const lower = item.file.name.toLowerCase();
+                if (SPECIAL_LABELS[lower]) {
+                    const pill = document.createElement('span');
+                    pill.className = 'card-special-pill';
+                    pill.textContent = SPECIAL_LABELS[lower];
+                    thumb.appendChild(pill);
+                }
+
+                const removeBtn = document.createElement('button');
+                removeBtn.type = 'button';
+                removeBtn.className = 'card-remove';
+                removeBtn.setAttribute('aria-label', `Remove ${item.file.name}`);
+                removeBtn.textContent = '✕';
+                removeBtn.addEventListener('click', () => removeQueuedItem(item.id));
+                thumb.appendChild(removeBtn);
+
+                const meta = document.createElement('div');
+                meta.className = 'sticker-meta';
+
+                const nameEl = document.createElement('div');
+                nameEl.className = 'sticker-name';
+                nameEl.title = item.file.name;
+                nameEl.textContent = item.file.name;
+
+                const subEl = document.createElement('div');
+                subEl.className = 'sticker-sub';
+                const sizeSpan = document.createElement('span');
+                sizeSpan.textContent = formatBytes(item.file.size);
+                const dimSpan = document.createElement('span');
+                dimSpan.textContent = item.url ? '...' : 'ZIP';
+                subEl.appendChild(sizeSpan);
+                subEl.appendChild(dimSpan);
+
+                if (item.url) {
+                    const img = document.createElement('img');
+                    img.src = item.url;
+                    img.alt = item.file.name;
+                    img.onload = () => {
+                        dimSpan.textContent = `${img.naturalWidth}×${img.naturalHeight}`;
+                    };
+                    thumb.appendChild(img);
+                } else {
+                    const zipBadge = document.createElement('div');
+                    zipBadge.className = 'sticker-zip-badge';
+                    zipBadge.textContent = '.ZIP';
+                    thumb.appendChild(zipBadge);
+                }
+
+                meta.appendChild(nameEl);
+                meta.appendChild(subEl);
+                card.appendChild(thumb);
+                card.appendChild(meta);
+                stagingGrid.appendChild(card);
+            });
+        }
 
         exportLogBtn.addEventListener('click', (e) => {
             e.preventDefault();
@@ -378,38 +404,31 @@
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `sticker_converter_log_${new Date().getTime()}.txt`;
+            a.download = `sticker_converter_log_${Date.now()}.txt`;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
             window.URL.revokeObjectURL(url);
         });
 
-        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-            dropZone.addEventListener(eventName, preventDefaults, false);
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach((eventName) => {
+            dropZone.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+            }, false);
         });
 
-        function preventDefaults(e) {
-            e.preventDefault();
-            e.stopPropagation();
-        }
-
-        ['dragenter', 'dragover'].forEach(eventName => {
+        ['dragenter', 'dragover'].forEach((eventName) => {
             dropZone.addEventListener(eventName, () => dropZone.classList.add('dragover'), false);
         });
 
-        ['dragleave', 'drop'].forEach(eventName => {
+        ['dragleave', 'drop'].forEach((eventName) => {
             dropZone.addEventListener(eventName, () => dropZone.classList.remove('dragover'), false);
         });
 
         dropZone.addEventListener('drop', (e) => {
-            let dt = e.dataTransfer;
-            let files = dt.files;
-            if (files.length > 0 && /\.(zip|gif|png)$/i.test(files[0].name)) {
-                fileInput.files = files;
-                updateFilePreview();
-            } else {
-                showStatus('Please upload a .zip, .gif or .png file!', 'error');
+            if (e.dataTransfer.files.length > 0) {
+                addFiles(e.dataTransfer.files);
             }
         });
 
@@ -420,46 +439,32 @@
                 fileInput.click();
             }
         });
-        fileInput.addEventListener('change', updateFilePreview);
 
-        removeFileBtn.addEventListener('click', () => {
-            fileInput.value = '';
-            updateFilePreview();
-            statusMessage.style.display = 'none';
+        fileInput.addEventListener('change', () => {
+            if (fileInput.files.length > 0) {
+                addFiles(fileInput.files);
+                fileInput.value = '';
+            }
         });
 
-        function updateFilePreview() {
-            if (fileInput.files.length > 0) {
-                fileName.textContent = fileInput.files[0].name;
-                filePreview.style.display = 'flex';
-                convertBtn.disabled = false;
-                dropZone.style.display = 'none';
-            } else {
-                filePreview.style.display = 'none';
-                convertBtn.disabled = true;
-                dropZone.style.display = 'flex';
-            }
-        }
-
-        function showStatus(msg, type) {
-            statusMessage.textContent = msg;
-            statusMessage.className = `status-message ${type}`;
-            statusMessage.style.display = 'block';
-        }
+        clearAllBtn.addEventListener('click', () => {
+            clearQueue();
+            statusMessage.style.display = 'none';
+        });
 
         function appendLog(msg) {
             if (!logContainer) return;
             fullLogs.push(msg);
-            
+
             let colorClass = 'log-default';
             const upperMsg = msg.toUpperCase();
-            if (upperMsg.includes('SUCCESS') || upperMsg.includes('PASSED')) {
+            if (upperMsg.includes('PASSED') || upperMsg.includes('SUCCESS')) {
                 colorClass = 'log-success';
             } else if (upperMsg.includes('ERROR') || upperMsg.includes('FAILED') || upperMsg.includes('COULD NOT')) {
                 colorClass = 'log-error';
             } else if (upperMsg.includes('WARNING')) {
                 colorClass = 'log-warning';
-            } else if (upperMsg.includes('===') || upperMsg.includes('PROCESSING') || upperMsg.includes('TRYING')) {
+            } else if (upperMsg.includes('===') || upperMsg.includes('PROCESSING') || upperMsg.includes('NORMALIZING')) {
                 colorClass = 'log-processing';
             }
 
@@ -470,59 +475,218 @@
             logContainer.scrollTop = logContainer.scrollHeight;
         }
 
+        function renderResults(sessionId, manifest, elapsedMs, downloadAllUrl) {
+            currentSessionId = sessionId;
+            currentManifest = manifest;
+            activeTab = 'all';
+
+            let totalFiles = 0;
+            let passedFiles = 0;
+            const activePlatforms = [];
+
+            Object.keys(PLATFORM_META).forEach((p) => {
+                const list = manifest[p] || [];
+                if (list.length > 0) {
+                    activePlatforms.push(p);
+                    totalFiles += list.length;
+                    passedFiles += list.filter((f) => f.passed).length;
+                }
+            });
+
+            const sec = (elapsedMs / 1000).toFixed(1);
+            resultsSummary.textContent = `${totalFiles} output file(s) generated in ${sec}s · ${passedFiles}/${totalFiles} within platform limits`;
+
+            // Render Download Buttons (All Platforms Batch + Individual Platforms)
+            downloadBar.innerHTML = '';
+            const allBtn = document.createElement('a');
+            allBtn.className = 'dl-btn primary';
+            allBtn.href = downloadAllUrl;
+            allBtn.innerHTML = `<span>Download All Platforms (ZIP)</span><span class="dl-btn-meta">${totalFiles} files</span>`;
+            downloadBar.appendChild(allBtn);
+
+            activePlatforms.forEach((p) => {
+                const meta = PLATFORM_META[p];
+                const list = manifest[p];
+                const btn = document.createElement('a');
+                btn.className = 'dl-btn';
+                btn.href = `/download/${sessionId}/platform/${p}`;
+                btn.innerHTML = `<svg><use href="${meta.logo}"/></svg><span>${meta.label}</span><span class="dl-btn-meta">${list.length} · ${meta.ext}</span>`;
+                downloadBar.appendChild(btn);
+            });
+
+            // Render Platform Filter Tabs
+            platformTabs.innerHTML = '';
+            const allTab = document.createElement('button');
+            allTab.type = 'button';
+            allTab.className = 'platform-tab active';
+            allTab.textContent = `All Platforms (${totalFiles})`;
+            allTab.addEventListener('click', () => {
+                activeTab = 'all';
+                updateTabButtons();
+                renderResultsGrid();
+            });
+            platformTabs.appendChild(allTab);
+
+            activePlatforms.forEach((p) => {
+                const meta = PLATFORM_META[p];
+                const list = manifest[p];
+                const tab = document.createElement('button');
+                tab.type = 'button';
+                tab.className = 'platform-tab';
+                tab.dataset.platform = p;
+                tab.innerHTML = `<svg><use href="${meta.logo}"/></svg><span>${meta.label} (${list.length})</span>`;
+                tab.addEventListener('click', () => {
+                    activeTab = p;
+                    updateTabButtons();
+                    renderResultsGrid();
+                });
+                platformTabs.appendChild(tab);
+            });
+
+            renderResultsGrid();
+            resultsPanel.style.display = 'block';
+            resultsPanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+
+        function updateTabButtons() {
+            platformTabs.querySelectorAll('.platform-tab').forEach((btn) => {
+                const p = btn.dataset.platform || 'all';
+                btn.classList.toggle('active', p === activeTab);
+            });
+        }
+
+        function renderResultsGrid() {
+            resultsGrid.innerHTML = '';
+            if (!currentManifest) return;
+
+            const platformsToShow = activeTab === 'all' ? Object.keys(PLATFORM_META) : [activeTab];
+
+            platformsToShow.forEach((p) => {
+                const meta = PLATFORM_META[p];
+                const files = currentManifest[p] || [];
+
+                files.forEach((file) => {
+                    const card = document.createElement('div');
+                    card.className = 'sticker-card';
+
+                    const thumb = document.createElement('div');
+                    thumb.className = 'sticker-thumb';
+
+                    const badge = document.createElement('span');
+                    badge.className = 'result-platform-badge';
+                    badge.innerHTML = `<svg><use href="${meta.logo}"/></svg><span>${meta.label}</span>`;
+                    thumb.appendChild(badge);
+
+                    const dlLink = document.createElement('a');
+                    dlLink.className = 'result-dl-icon';
+                    dlLink.href = file.downloadUrl;
+                    dlLink.title = `Download ${file.name}`;
+                    dlLink.textContent = '↓';
+                    thumb.appendChild(dlLink);
+
+                    if (file.ext === '.webm') {
+                        const vid = document.createElement('video');
+                        vid.src = file.previewUrl;
+                        vid.autoplay = true;
+                        vid.loop = true;
+                        vid.muted = true;
+                        vid.playsInline = true;
+                        thumb.appendChild(vid);
+                    } else {
+                        const img = document.createElement('img');
+                        img.src = file.previewUrl;
+                        img.alt = file.name;
+                        thumb.appendChild(img);
+                    }
+
+                    const cardMeta = document.createElement('div');
+                    cardMeta.className = 'sticker-meta';
+
+                    const nameEl = document.createElement('div');
+                    nameEl.className = 'sticker-name';
+                    nameEl.title = file.name;
+                    nameEl.textContent = file.name;
+
+                    const subEl = document.createElement('div');
+                    subEl.className = 'sticker-sub';
+
+                    const sizeText = document.createElement('span');
+                    sizeText.textContent = file.limit
+                        ? `${formatBytes(file.size)} / ${formatBytes(file.limit)}`
+                        : formatBytes(file.size);
+
+                    const statusPill = document.createElement('span');
+                    statusPill.className = `size-pill ${file.passed ? 'pass' : 'warn'}`;
+                    statusPill.textContent = file.passed ? 'PASS' : 'OVER';
+
+                    subEl.appendChild(sizeText);
+                    subEl.appendChild(statusPill);
+                    cardMeta.appendChild(nameEl);
+                    cardMeta.appendChild(subEl);
+
+                    card.appendChild(thumb);
+                    card.appendChild(cardMeta);
+                    resultsGrid.appendChild(card);
+                });
+            });
+        }
+
         uploadForm.addEventListener('submit', async (e) => {
             e.preventDefault();
-            
-            if (!fileInput.files.length) return;
+            if (!queuedItems.length) return;
+
+            if (currentSessionId) {
+                fetch(`/session/${currentSessionId}`, { method: 'DELETE' }).catch(() => {});
+                currentSessionId = null;
+            }
 
             convertBtn.disabled = true;
-            btnText.textContent = 'Processing...';
+            btnText.textContent = 'Converting...';
             spinner.style.display = 'block';
             statusMessage.style.display = 'none';
-            
+            resultsPanel.style.display = 'none';
+
             logWrapper.style.display = 'block';
+            logWrapper.open = true;
             logContainer.style.display = 'block';
             appendLog('\n========================================');
-            appendLog('NEW RUN: Uploading file to server...');
+            appendLog(`NEW BATCH: Uploading ${queuedItems.length} file(s) to fast pipeline...`);
 
             const formData = new FormData();
-            formData.append('stickerZip', fileInput.files[0]);
+            queuedItems.forEach((item) => {
+                formData.append('stickers', item.file);
+            });
 
             try {
                 const response = await fetch('/upload', {
                     method: 'POST',
-                    body: formData
+                    body: formData,
                 });
 
                 if (response.ok) {
                     const data = await response.json();
                     const sessionId = data.sessionId;
-                    
-                    appendLog('Upload complete! Server is now processing...');
-                    
+                    appendLog('Upload complete! Running fast pipeline...');
+
                     if (eventSource) eventSource.close();
                     eventSource = new EventSource(`/logs/${sessionId}`);
-                    
+
                     eventSource.onmessage = (event) => {
                         const evtData = JSON.parse(event.data);
                         if (evtData.type === 'log') {
                             appendLog(evtData.message);
                         } else if (evtData.type === 'done') {
                             appendLog('\n--- PROCESSING COMPLETE ---');
-                            showStatus('Stickers successfully converted! Downloading...', 'success');
-                            window.location.href = evtData.url;
+                            showStatus('Conversion complete! Preview your stickers below and download one platform or all platforms.', 'success');
+                            renderResults(evtData.sessionId, evtData.manifest, evtData.elapsedMs, evtData.downloadAllUrl);
                             eventSource.close();
-                            setTimeout(() => {
-                                fileInput.value = '';
-                                updateFilePreview();
-                                btnText.textContent = 'Convert & Download Stickers';
-                                spinner.style.display = 'none';
-                                // log container stays visible
-                            }, 5000);
+                            convertBtn.disabled = false;
+                            btnText.textContent = `Convert ${queuedItems.length} Sticker${queuedItems.length > 1 ? 's' : ''}`;
+                            spinner.style.display = 'none';
                         } else if (evtData.type === 'error') {
                             appendLog(`\nERROR: ${evtData.message}`);
                             showStatus(`Error: ${evtData.message}`, 'error');
-                            btnText.textContent = 'Convert & Download Stickers';
+                            btnText.textContent = `Convert ${queuedItems.length} Sticker${queuedItems.length > 1 ? 's' : ''}`;
                             spinner.style.display = 'none';
                             convertBtn.disabled = false;
                             eventSource.close();
@@ -532,28 +696,27 @@
                     eventSource.onerror = (err) => {
                         console.error('SSE Error', err);
                     };
-                    
                 } else {
-                    let errText = "Unknown error";
+                    let errText = 'Unknown error';
                     try {
                         const errData = await response.json();
                         errText = errData.error || errText;
-                    } catch (e) {
-                         errText = await response.text();
+                    } catch (_) {
+                        errText = await response.text();
                     }
                     showStatus(`Error: ${errText}`, 'error');
-                    btnText.textContent = 'Convert & Download Stickers';
+                    btnText.textContent = `Convert ${queuedItems.length} Sticker${queuedItems.length > 1 ? 's' : ''}`;
                     spinner.style.display = 'none';
                     convertBtn.disabled = false;
                 }
             } catch (error) {
                 showStatus('Network error during upload.', 'error');
-                btnText.textContent = 'Convert & Download Stickers';
+                btnText.textContent = `Convert ${queuedItems.length} Sticker${queuedItems.length > 1 ? 's' : ''}`;
                 spinner.style.display = 'none';
                 convertBtn.disabled = false;
             }
         });
-    
+
         (function () {
             if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
             const scene = document.getElementById('scene');
@@ -569,7 +732,7 @@
                 scene.style.setProperty('--ry', '0deg');
                 scene.style.setProperty('--rx', '0deg');
             });
-            document.querySelectorAll('.panel').forEach((el) => {
+            document.querySelectorAll('.upload-panel, .side-panel').forEach((el) => {
                 el.addEventListener('pointermove', (e) => {
                     const r = el.getBoundingClientRect();
                     const x = (e.clientX - r.left) / r.width - 0.5;
