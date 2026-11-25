@@ -160,45 +160,10 @@
 
                     <div class="side-divider"></div>
 
-                    <details class="platform-specs">
-                        <summary>Output specifications</summary>
-                        <div class="platform-specs-content">
-                            <h5>WhatsApp</h5>
-                            <ul>
-                                <li><strong>Format:</strong> Animated WebP (recommended, full color) or GIF</li>
-                                <li><strong>Size:</strong> 512x512 pixels, ≤ 500 KB</li>
-                                <li><strong>Framerate & Duration:</strong> Original FPS, dynamic fit</li>
-                            </ul>
-
-                            <h5>LINE</h5>
-                            <ul>
-                                <li><strong>Format:</strong> APNG</li>
-                                <li><strong>Size:</strong> 320x270 max (main.gif: 240x240, tab.png: 96x74), ≤ 300 KB (main ≤ 1 MB)</li>
-                                <li><strong>Framerate & Duration:</strong> 5-20 frames, strictly 1, 2, 3, or 4 seconds, loops within 4s max</li>
-                            </ul>
-
-                            <h5>Telegram</h5>
-                            <ul>
-                                <li><strong>Format:</strong> WEBM (VP9 + Alpha)</li>
-                                <li><strong>Size:</strong> 512x512 max, ≤ 256 KB</li>
-                                <li><strong>Framerate & Duration:</strong> Max 30 FPS, max 3 seconds</li>
-                            </ul>
-
-                            <h5>Signal</h5>
-                            <ul>
-                                <li><strong>Format:</strong> APNG</li>
-                                <li><strong>Size:</strong> 512x512 pixels, ≤ 300 KB</li>
-                                <li><strong>Framerate & Duration:</strong> Max 30 FPS, max 3 seconds</li>
-                            </ul>
-
-                            <h5>WeChat</h5>
-                            <ul>
-                                <li><strong>Format:</strong> GIF</li>
-                                <li><strong>Size:</strong> Max 240x240 pixels (cover.png: 240x240, icon.png: 50x50), ≤ 500 KB</li>
-                                <li><strong>Framerate & Duration:</strong> Dynamic adjustment, optimized palette</li>
-                            </ul>
-                        </div>
-                    </details>
+                    <button type="button" id="openSpecsBtn" class="specs-trigger-btn">
+                        <span>Output specifications</span>
+                        <span class="specs-trigger-icon" aria-hidden="true">↗</span>
+                    </button>
                 </aside>
             </div>
 
@@ -228,6 +193,55 @@
         </main>
     </div>
 
+    <dialog id="specsModal" class="specs-modal" aria-labelledby="specsModalTitle">
+        <div class="specs-modal-header">
+            <h3 id="specsModalTitle">Platform Output Specifications</h3>
+            <button type="button" id="closeSpecsBtn" class="specs-close-btn" aria-label="Close specifications">✕</button>
+        </div>
+        <div class="specs-modal-body">
+            <div class="spec-card">
+                <div class="spec-card-head"><svg><use href="#logo-whatsapp"/></svg><span>WhatsApp</span></div>
+                <ul>
+                    <li><strong>Format:</strong> Animated WebP (recommended, full color) or GIF</li>
+                    <li><strong>Size:</strong> 512×512 px (min 85% inner scale), ≤ 500 KB</li>
+                    <li><strong>Framerate &amp; Duration:</strong> Original FPS, dynamic fit</li>
+                </ul>
+            </div>
+            <div class="spec-card">
+                <div class="spec-card-head"><svg><use href="#logo-wechat"/></svg><span>WeChat</span></div>
+                <ul>
+                    <li><strong>Format:</strong> GIF</li>
+                    <li><strong>Size:</strong> Max 240×240 px (cover.png: 240×240, icon.png: 50×50), ≤ 500 KB</li>
+                    <li><strong>Framerate &amp; Duration:</strong> Dynamic adjustment, optimized palette</li>
+                </ul>
+            </div>
+            <div class="spec-card">
+                <div class="spec-card-head"><svg><use href="#logo-line"/></svg><span>LINE</span></div>
+                <ul>
+                    <li><strong>Format:</strong> APNG</li>
+                    <li><strong>Size:</strong> 320×270 max (main.gif: 240×240, tab.png: 96×74), ≤ 300 KB (main ≤ 1 MB)</li>
+                    <li><strong>Framerate &amp; Duration:</strong> 5–20 frames, strictly 1, 2, 3, or 4s, loops within 4s</li>
+                </ul>
+            </div>
+            <div class="spec-card">
+                <div class="spec-card-head"><svg><use href="#logo-telegram"/></svg><span>Telegram</span></div>
+                <ul>
+                    <li><strong>Format:</strong> WEBM (VP9 + Alpha)</li>
+                    <li><strong>Size:</strong> 512×512 max, ≤ 256 KB</li>
+                    <li><strong>Framerate &amp; Duration:</strong> Max 30 FPS, max 3s</li>
+                </ul>
+            </div>
+            <div class="spec-card">
+                <div class="spec-card-head"><svg><use href="#logo-signal"/></svg><span>Signal</span></div>
+                <ul>
+                    <li><strong>Format:</strong> APNG</li>
+                    <li><strong>Size:</strong> 512×512 px (min 70% inner scale), ≤ 300 KB</li>
+                    <li><strong>Framerate &amp; Duration:</strong> Max 30 FPS, max 3s</li>
+                </ul>
+            </div>
+        </div>
+    </dialog>
+
     <script>
         const dropZone = document.getElementById('dropZone');
         const dropTitle = document.getElementById('dropTitle');
@@ -249,6 +263,21 @@
         const logContainer = document.getElementById('logContainer');
         const logWrapper = document.getElementById('logWrapper');
         const exportLogBtn = document.getElementById('exportLogBtn');
+        const openSpecsBtn = document.getElementById('openSpecsBtn');
+        const closeSpecsBtn = document.getElementById('closeSpecsBtn');
+        const specsModal = document.getElementById('specsModal');
+
+        openSpecsBtn.addEventListener('click', () => {
+            if (typeof specsModal.showModal === 'function') {
+                specsModal.showModal();
+            } else {
+                specsModal.setAttribute('open', '');
+            }
+        });
+        closeSpecsBtn.addEventListener('click', () => specsModal.close());
+        specsModal.addEventListener('click', (e) => {
+            if (e.target === specsModal) specsModal.close();
+        });
 
         const PLATFORM_META = {
             whatsapp: { label: 'WhatsApp', logo: '#logo-whatsapp', ext: '.gif' },
@@ -673,7 +702,7 @@
             resultsPanel.style.display = 'none';
 
             logWrapper.style.display = 'block';
-            logWrapper.open = true;
+            logWrapper.open = false;
             logContainer.style.display = 'block';
             appendLog('\n========================================');
             appendLog(`NEW BATCH: Uploading ${queuedItems.length} file(s) to fast pipeline...`);

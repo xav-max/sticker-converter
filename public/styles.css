@@ -1021,6 +1021,130 @@ summary:focus-visible {
     font-size: 11px;
 }
 
+.specs-trigger-btn {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 14px;
+    color: #c8d4e3;
+    background: rgba(5, 12, 21, 0.35);
+    border: 1px solid var(--line);
+    border-radius: 9px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 600;
+    transition: border-color 150ms ease, background 150ms ease, color 150ms ease;
+}
+
+.specs-trigger-btn:hover {
+    color: #fff;
+    background: rgba(124, 140, 255, 0.1);
+    border-color: rgba(124, 140, 255, 0.45);
+}
+
+.specs-trigger-icon {
+    color: var(--accent);
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+    font-size: 13px;
+}
+
+.specs-modal {
+    width: min(92vw, 660px);
+    max-height: 85vh;
+    padding: 0;
+    color: var(--text);
+    background: linear-gradient(155deg, rgba(18, 29, 45, 0.99), rgba(11, 17, 31, 0.99));
+    border: 1px solid rgba(140, 160, 230, 0.28);
+    border-radius: 16px;
+    box-shadow: 0 28px 80px rgba(0, 0, 0, 0.6);
+    overflow: hidden;
+}
+
+.specs-modal::backdrop {
+    background: rgba(4, 7, 15, 0.72);
+    backdrop-filter: blur(6px);
+}
+
+.specs-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 18px 22px;
+    border-bottom: 1px solid var(--line);
+}
+
+.specs-modal-header h3 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 650;
+}
+
+.specs-close-btn {
+    display: grid;
+    width: 32px;
+    height: 32px;
+    place-items: center;
+    color: var(--muted);
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: color 150ms ease, background 150ms ease;
+}
+
+.specs-close-btn:hover {
+    color: #fff;
+    background: rgba(255, 122, 133, 0.18);
+    border-color: rgba(255, 122, 133, 0.45);
+}
+
+.specs-modal-body {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 12px;
+    padding: 20px 22px 24px;
+    overflow-y: auto;
+    max-height: calc(85vh - 70px);
+}
+
+.spec-card {
+    padding: 14px 15px;
+    background: var(--surface-soft);
+    border: 1px solid var(--line);
+    border-radius: 11px;
+}
+
+.spec-card-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+    color: var(--text);
+    font-size: 13px;
+    font-weight: 650;
+}
+
+.spec-card-head svg {
+    width: 18px;
+    height: 18px;
+}
+
+.spec-card ul {
+    margin: 0;
+    padding-left: 16px;
+    color: var(--muted);
+    font-size: 12px;
+    line-height: 1.65;
+}
+
+.spec-card strong {
+    color: #cbd5e1;
+    font-weight: 600;
+}
+
 @media (max-width: 760px) {
     body {
         padding: 22px 16px 40px;
