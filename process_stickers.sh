@@ -126,8 +126,12 @@ render_apng_candidate() {
   if [ "$HAS_PNGQUANT" -eq 1 ] && [ "$HAS_APNGASM" -eq 1 ]; then
     rm -rf "$fdir" && mkdir -p "$fdir"
     ffmpeg -nostdin -y -v error -i "$src" -vf "fps=${fps},${sf}" "${dur_args[@]}" "$fdir/f_%04d.png"
+    local pq_flags=(--speed 3 --force --ext .png)
+    if [ "$dither" == "none" ]; then
+      pq_flags+=(--nofs)
+    fi
     if [ "$colors" -le 256 ]; then
-      pngquant "$colors" --speed 3 --force --ext .png "$fdir"/f_*.png >/dev/null 2>&1 || true
+      pngquant "$colors" "${pq_flags[@]}" "$fdir"/f_*.png >/dev/null 2>&1 || true
     fi
     apngasm -o "$out" "$fdir"/f_*.png -d "1:${fps}" -l "${plays:-0}" -F >/dev/null 2>&1
     strip_apng_chunks "$out"
@@ -141,7 +145,7 @@ render_apng_candidate() {
 
 # Quality-preserving ladder:
 # 1. Keep full canvas & full FPS while trimming colors gently (256 -> 128)
-# 2. Trade inner artwork scale (82% -> 66% -> 52% -> 44%) while keeping >= 64 colors & full FPS!
+# 2. Trade inner artwork scale down to min_scale_pct (e.g. 85% WhatsApp, 70% Signal)
 # 3. Only reduce FPS or drop below 64 colors as a true last resort.
 build_quality_ladder() {
   local fps_max="$1"
@@ -149,9 +153,11 @@ build_quality_ladder() {
   local fixed_total_min="$3"
   local fixed_total_max="$4"
   local dur_int="$5"
+  local min_scale_pct="${6:-70}"
 
   awk -v fmax="$fps_max" -v fmin="$fps_min" \
-      -v tmin="$fixed_total_min" -v tmax="$fixed_total_max" -v dint="$dur_int" '
+      -v tmin="$fixed_total_min" -v tmax="$fixed_total_max" -v dint="$dur_int" \
+      -v mscale="$min_scale_pct" '
   function clamp_fps(f,    tot) {
     if (f < fmin) f = fmin;
     if (f > fmax) f = fmax;
@@ -163,29 +169,34 @@ build_quality_ladder() {
     }
     return f;
   }
+  function clamp_scale(s) {
+    if (s < mscale) s = mscale;
+    return s;
+  }
   BEGIN {
     # scale_pct : colors : fps_ratio : dither
     sc[0]=100; c[0]=256; fr[0]=1.00; d[0]="sierra2_4a";
     sc[1]=100; c[1]=128; fr[1]=1.00; d[1]="sierra2_4a";
-    sc[2]=82;  c[2]=192; fr[2]=1.00; d[2]="sierra2_4a";
-    sc[3]=82;  c[3]=128; fr[3]=1.00; d[3]="sierra2_4a";
-    sc[4]=66;  c[4]=128; fr[4]=1.00; d[4]="sierra2_4a";
-    sc[5]=66;  c[5]=96;  fr[5]=1.00; d[5]="sierra2_4a";
-    sc[6]=52;  c[6]=128; fr[6]=1.00; d[6]="sierra2_4a";
-    sc[7]=52;  c[7]=64;  fr[7]=1.00; d[7]="sierra2_4a";
-    sc[8]=44;  c[8]=64;  fr[8]=1.00; d[8]="none";
-    sc[9]=50;  c[9]=64;  fr[9]=0.75; d[9]="none";
-    sc[10]=44; c[10]=48; fr[10]=0.75; d[10]="none";
-    sc[11]=44; c[11]=48; fr[11]=0.65; d[11]="none";
-    sc[12]=40; c[12]=32; fr[12]=0.60; d[12]="none";
-    sc[13]=36; c[13]=24; fr[13]=0.50; d[13]="none";
-    sc[14]=36; c[14]=16; fr[14]=0.50; d[14]="none";
+    sc[2]=85;  c[2]=192; fr[2]=1.00; d[2]="sierra2_4a";
+    sc[3]=85;  c[3]=128; fr[3]=1.00; d[3]="sierra2_4a";
+    sc[4]=75;  c[4]=128; fr[4]=1.00; d[4]="sierra2_4a";
+    sc[5]=75;  c[5]=96;  fr[5]=1.00; d[5]="sierra2_4a";
+    sc[6]=70;  c[6]=128; fr[6]=1.00; d[6]="sierra2_4a";
+    sc[7]=70;  c[7]=64;  fr[7]=1.00; d[7]="sierra2_4a";
+    sc[8]=70;  c[8]=64;  fr[8]=1.00; d[8]="none";
+    sc[9]=70;  c[9]=64;  fr[9]=0.75; d[9]="none";
+    sc[10]=70; c[10]=48; fr[10]=0.75; d[10]="none";
+    sc[11]=70; c[11]=48; fr[11]=0.65; d[11]="none";
+    sc[12]=70; c[12]=32; fr[12]=0.60; d[12]="none";
+    sc[13]=70; c[13]=24; fr[13]=0.50; d[13]="none";
+    sc[14]=70; c[14]=16; fr[14]=0.50; d[14]="none";
 
     prev = "";
     for (i = 0; i < 15; i++) {
+      s = clamp_scale(sc[i]);
       fps = int(fmax * fr[i] + 0.5);
       fps = clamp_fps(fps);
-      entry = sc[i] ":" c[i] ":" fps ":" d[i];
+      entry = s ":" c[i] ":" fps ":" d[i];
       if (entry != prev) {
         print entry;
         prev = entry;
@@ -245,8 +256,8 @@ optimize_webp() {
     return 0
   fi
 
-  # Fallback: step inner scale / FPS with q=50
-  local fallbacks=("75:${fps_max}:55" "60:${fps_max}:50" "55:${fps_min}:45" "45:${fps_min}:35")
+  # Fallback: step inner scale (min 85%) / FPS with lower quality
+  local fallbacks=("92:${fps_max}:55" "85:${fps_max}:50" "85:${fps_min}:45" "85:${fps_min}:35")
   for cfg in "${fallbacks[@]}"; do
     local pct fps q
     IFS=':' read -r pct fps q <<< "$cfg"
@@ -276,7 +287,8 @@ optimize_gif() {
   local pad_canvas="$7"
   local fps_max="$8"
   local fps_min="$9"
-  local work="${10}"
+  local min_scale_pct="${10}"
+  local work="${11}"
 
   local raw_gif="$work/${label}_raw.gif"
   local best_gif="$work/${label}_best.gif"
@@ -330,7 +342,7 @@ optimize_gif() {
   local ladder=()
   while IFS= read -r line; do
     ladder+=("$line")
-  done < <(build_quality_ladder "$fps_max" "$fps_min" 0 0 0)
+  done < <(build_quality_ladder "$fps_max" "$fps_min" 0 0 0 "$min_scale_pct")
 
   local lo=1
   local hi=$(( ${#ladder[@]} - 1 ))
@@ -392,7 +404,8 @@ optimize_apng() {
   local tmin="${12}"
   local tmax="${13}"
   local dur_int="${14}"
-  local work="${15}"
+  local min_scale_pct="${15}"
+  local work="${16}"
 
   local best_png="$work/${label}_best.png"
   local cand_png="$work/${label}_cand.png"
@@ -401,7 +414,7 @@ optimize_apng() {
   local ladder=()
   while IFS= read -r line; do
     ladder+=("$line")
-  done < <(build_quality_ladder "$fps_max" "$fps_min" "$tmin" "$tmax" "$dur_int")
+  done < <(build_quality_ladder "$fps_max" "$fps_min" "$tmin" "$tmax" "$dur_int" "$min_scale_pct")
 
   # Pass 1: Full canvas, 256 colors, full FPS
   local pct0 c0 f0 d0
@@ -659,7 +672,7 @@ while IFS= read -r -d '' INPUT; do
   if [ "$IS_MAIN" -eq 0 ]; then
     if [ "$WHATSAPP_FORMAT" == "gif" ]; then
       (
-        optimize_gif "WhatsApp" "$WORK_DIR/src_512.mkv" "$OUT_WA" "$MAX_WA" 512 512 1 "$ORIG_FPS" "$HALF_FPS" "$WORK_DIR" \
+        optimize_gif "WhatsApp" "$WORK_DIR/src_512.mkv" "$OUT_WA" "$MAX_WA" 512 512 1 "$ORIG_FPS" "$HALF_FPS" 85 "$WORK_DIR" \
           > "$WORK_DIR/log_wa.txt" 2>&1 || touch "$WORK_DIR/fail_wa"
       ) & PIDS+=($!)
     else
@@ -670,7 +683,7 @@ while IFS= read -r -d '' INPUT; do
     fi
 
     (
-      optimize_gif "WeChat" "$WORK_DIR/src_240.mkv" "$OUT_WC" "$MAX_WC" 240 240 0 "$ORIG_FPS" "$HALF_FPS" "$WORK_DIR" \
+      optimize_gif "WeChat" "$WORK_DIR/src_240.mkv" "$OUT_WC" "$MAX_WC" 240 240 0 "$ORIG_FPS" "$HALF_FPS" 70 "$WORK_DIR" \
         > "$WORK_DIR/log_wc.txt" 2>&1 || touch "$WORK_DIR/fail_wc"
     ) & PIDS+=($!)
 
@@ -680,13 +693,13 @@ while IFS= read -r -d '' INPUT; do
     ) & PIDS+=($!)
 
     (
-      optimize_apng "Signal" "$WORK_DIR/src_512_3s.mkv" "$OUT_SIG" "$MAX_SIG" 512 512 1 "$CAP_FPS" "$CAP_HALF_FPS" "3" "0" "0" "0" "0" "$WORK_DIR" \
+      optimize_apng "Signal" "$WORK_DIR/src_512_3s.mkv" "$OUT_SIG" "$MAX_SIG" 512 512 1 "$CAP_FPS" "$CAP_HALF_FPS" "3" "0" "0" "0" "0" 70 "$WORK_DIR" \
         > "$WORK_DIR/log_sig.txt" 2>&1 || touch "$WORK_DIR/fail_sig"
     ) & PIDS+=($!)
   fi
 
   (
-    optimize_apng "LINE" "$WORK_DIR/src_line.mkv" "$OUT_LINE" "$MAX_LINE" "$LINE_W" "$LINE_H" 0 "$LINE_FPS" "1" "$LINE_DUR" "$LINE_PLAYS" "5" "20" "$LINE_DUR" "$WORK_DIR" \
+    optimize_apng "LINE" "$WORK_DIR/src_line.mkv" "$OUT_LINE" "$MAX_LINE" "$LINE_W" "$LINE_H" 0 "$LINE_FPS" "1" "$LINE_DUR" "$LINE_PLAYS" "5" "20" "$LINE_DUR" 70 "$WORK_DIR" \
       > "$WORK_DIR/log_line.txt" 2>&1 || touch "$WORK_DIR/fail_line"
   ) & PIDS+=($!)
 
