@@ -93,14 +93,19 @@ render_gif_candidate() {
   local fps="$7"
   local colors="$8"
   local dither="$9"
+  local stabilize="${10:-0}"
 
   local sf
   sf=$(build_scale_filter "$canvas_w" "$canvas_h" "$scale_pct" "$pad_canvas")
-  local vf="[0:v]fps=${fps},${sf},split[s0][s1];[s0]palettegen=max_colors=${colors}:stats_mode=full:reserve_transparent=1[p];[s1][p]paletteuse=dither=${dither}:diff_mode=rectangle"
+  local pre_vf="fps=${fps},${sf}"
+  if [ "$stabilize" -eq 1 ]; then
+    pre_vf="fps=${fps},${sf},split[sa][sc];[sc]format=yuv444p,atadenoise=0a=0.02:0b=0.04:1a=0.02:1b=0.04:2a=0.02:2b=0.04,format=rgb24[scd];[sa]alphaextract[sal];[scd][sal]alphamerge,format=rgba"
+  fi
+  local vf="[0:v]${pre_vf},split[s0][s1];[s0]palettegen=max_colors=${colors}:stats_mode=full:reserve_transparent=1[p];[s1][p]paletteuse=dither=${dither}:diff_mode=rectangle"
   ffmpeg -nostdin -y -v error -i "$src" -filter_complex "$vf" "$out"
 }
 
-# Render APNG via pngquant + apngasm when available, otherwise ffmpeg stats_mode=full
+# Render APNG via shared-palette sprite-sheet pngquant (colortype 3) + apngasm, or ffmpeg fallback
 render_apng_candidate() {
   local src="$1"
   local out="$2"
@@ -114,9 +119,15 @@ render_apng_candidate() {
   local max_dur="${10}"
   local plays="${11}"
   local fdir="${12}"
+  local stabilize="${13:-0}"
 
   local sf
   sf=$(build_scale_filter "$canvas_w" "$canvas_h" "$scale_pct" "$pad_canvas")
+
+  local pre_vf="fps=${fps},${sf}"
+  if [ "$stabilize" -eq 1 ]; then
+    pre_vf="fps=${fps},${sf},split[sa][sc];[sc]format=yuv444p,atadenoise=0a=0.02:0b=0.04:1a=0.02:1b=0.04:2a=0.02:2b=0.04,format=rgb24[scd];[sa]alphaextract[sal];[scd][sal]alphamerge,format=rgba"
+  fi
 
   local dur_args=()
   if [ -n "$max_dur" ]; then
@@ -125,28 +136,73 @@ render_apng_candidate() {
 
   if [ "$HAS_PNGQUANT" -eq 1 ] && [ "$HAS_APNGASM" -eq 1 ]; then
     rm -rf "$fdir" && mkdir -p "$fdir"
-    ffmpeg -nostdin -y -v error -i "$src" -vf "fps=${fps},${sf}" "${dur_args[@]}" "$fdir/f_%04d.png"
-    local pq_flags=(--speed 3 --force --ext .png)
-    if [ "$dither" == "none" ]; then
-      pq_flags+=(--nofs)
+    local sheet="$fdir/sheet.png"
+    local pal_raw="$fdir/pal.raw"
+    local pal_png="$fdir/pal.png"
+
+    # Count frames first by rendering clean PNGs or computing sprite grid
+    ffmpeg -nostdin -y -v error -i "$src" -vf "$pre_vf" "${dur_args[@]}" "$fdir/raw_%04d.png"
+    local n_frames
+    n_frames=$(ls -1 "$fdir"/raw_*.png 2>/dev/null | wc -l | tr -d ' ')
+    if [ "$n_frames" -gt 0 ]; then
+      local cols=8
+      if [ "$n_frames" -lt 8 ]; then cols="$n_frames"; fi
+      local rows=$(( (n_frames + cols - 1) / cols ))
+
+      ffmpeg -nostdin -y -v error -i "$fdir/raw_%04d.png" -filter_complex "tile=${cols}x${rows}:color=0x00000000" -frames:v 1 "$sheet"
+      local pq_flags=(--speed 2 --force --ext .png)
+      if [ "$dither" == "none" ]; then
+        pq_flags+=(--nofs)
+      fi
+      pngquant "$colors" "${pq_flags[@]}" "$sheet" >/dev/null 2>&1 || true
+
+      # Extract single shared 16x16 RGBA palette from quantized sheet so apngasm stays colortype 3 (indexed)
+      local has_plte
+      has_plte=$(node -e '
+        const fs = require("fs");
+        const d = fs.readFileSync(process.argv[1]);
+        let plte = null, trns = Buffer.alloc(0), i = 8;
+        while (i + 12 <= d.length) {
+          const l = d.readUInt32BE(i), t = d.toString("ascii", i + 4, i + 8);
+          if (t === "PLTE") plte = d.subarray(i + 8, i + 8 + l);
+          if (t === "tRNS") trns = d.subarray(i + 8, i + 8 + l);
+          i += 12 + l;
+        }
+        if (!plte || plte.length < 3) { console.log("0"); process.exit(0); }
+        const raw = Buffer.alloc(16 * 16 * 4);
+        const n = Math.floor(plte.length / 3);
+        for (let k = 0; k < 256; k++) {
+          const idx = k < n ? k : 0;
+          raw[k * 4] = plte[idx * 3];
+          raw[k * 4 + 1] = plte[idx * 3 + 1];
+          raw[k * 4 + 2] = plte[idx * 3 + 2];
+          raw[k * 4 + 3] = idx < trns.length ? trns[idx] : 255;
+        }
+        fs.writeFileSync(process.argv[2], raw);
+        console.log("1");
+      ' "$sheet" "$pal_raw")
+
+      if [ "$has_plte" == "1" ]; then
+        ffmpeg -nostdin -y -v error -f rawvideo -pix_fmt rgba -s 16x16 -i "$pal_raw" "$pal_png"
+        ffmpeg -nostdin -y -v error -i "$fdir/raw_%04d.png" -i "$pal_png" \
+          -filter_complex "[0:v][1:v]paletteuse=dither=${dither}" "$fdir/f_%04d.png"
+        apngasm -o "$out" "$fdir"/f_*.png -d "1:${fps}" -l "${plays:-0}" -F >/dev/null 2>&1
+        strip_apng_chunks "$out"
+        return 0
+      fi
     fi
-    if [ "$colors" -le 256 ]; then
-      pngquant "$colors" "${pq_flags[@]}" "$fdir"/f_*.png >/dev/null 2>&1 || true
-    fi
-    apngasm -o "$out" "$fdir"/f_*.png -d "1:${fps}" -l "${plays:-0}" -F >/dev/null 2>&1
-    strip_apng_chunks "$out"
-  else
-    local vf="[0:v]fps=${fps},${sf},split[s0][s1];[s0]palettegen=max_colors=${colors}:stats_mode=full:reserve_transparent=1[p];[s1][p]paletteuse=dither=${dither}:diff_mode=rectangle"
-    ffmpeg -nostdin -y -v error -i "$src" -filter_complex "$vf" \
-      -pred mixed -compression_level 9 "${dur_args[@]}" -plays "${plays:-0}" -f apng "$out"
-    strip_apng_chunks "$out"
   fi
+
+  local vf="[0:v]${pre_vf},split[s0][s1];[s0]palettegen=max_colors=${colors}:stats_mode=full:reserve_transparent=1[p];[s1][p]paletteuse=dither=${dither}:diff_mode=rectangle"
+  ffmpeg -nostdin -y -v error -i "$src" -filter_complex "$vf" \
+    -pred mixed -compression_level 9 "${dur_args[@]}" -plays "${plays:-0}" -f apng "$out"
+  strip_apng_chunks "$out"
 }
 
-# Quality-preserving ladder:
+# Quality-preserving ladder with >= 64 color floor:
 # 1. Keep full canvas & full FPS while trimming colors gently (256 -> 128)
 # 2. Trade inner artwork scale down to min_scale_pct (e.g. 85% WhatsApp, 70% Signal)
-# 3. Only reduce FPS or drop below 64 colors as a true last resort.
+# 3. Apply light temporal stabilization (atadenoise) & FPS reduction while keeping >= 64 colors!
 build_quality_ladder() {
   local fps_max="$1"
   local fps_min="$2"
@@ -174,29 +230,27 @@ build_quality_ladder() {
     return s;
   }
   BEGIN {
-    # scale_pct : colors : fps_ratio : dither
-    sc[0]=100; c[0]=256; fr[0]=1.00; d[0]="sierra2_4a";
-    sc[1]=100; c[1]=128; fr[1]=1.00; d[1]="sierra2_4a";
-    sc[2]=85;  c[2]=192; fr[2]=1.00; d[2]="sierra2_4a";
-    sc[3]=85;  c[3]=128; fr[3]=1.00; d[3]="sierra2_4a";
-    sc[4]=75;  c[4]=128; fr[4]=1.00; d[4]="sierra2_4a";
-    sc[5]=75;  c[5]=96;  fr[5]=1.00; d[5]="sierra2_4a";
-    sc[6]=70;  c[6]=128; fr[6]=1.00; d[6]="sierra2_4a";
-    sc[7]=70;  c[7]=64;  fr[7]=1.00; d[7]="sierra2_4a";
-    sc[8]=70;  c[8]=64;  fr[8]=1.00; d[8]="none";
-    sc[9]=70;  c[9]=64;  fr[9]=0.75; d[9]="none";
-    sc[10]=70; c[10]=48; fr[10]=0.75; d[10]="none";
-    sc[11]=70; c[11]=48; fr[11]=0.65; d[11]="none";
-    sc[12]=70; c[12]=32; fr[12]=0.60; d[12]="none";
-    sc[13]=70; c[13]=24; fr[13]=0.50; d[13]="none";
-    sc[14]=70; c[14]=16; fr[14]=0.50; d[14]="none";
+    # scale_pct : colors : fps_ratio : dither : stabilize
+    sc[0]=100; c[0]=256; fr[0]=1.00; d[0]="sierra2_4a"; st[0]=0;
+    sc[1]=100; c[1]=128; fr[1]=1.00; d[1]="sierra2_4a"; st[1]=0;
+    sc[2]=85;  c[2]=192; fr[2]=1.00; d[2]="sierra2_4a"; st[2]=0;
+    sc[3]=85;  c[3]=128; fr[3]=1.00; d[3]="sierra2_4a"; st[3]=0;
+    sc[4]=75;  c[4]=128; fr[4]=1.00; d[4]="sierra2_4a"; st[4]=0;
+    sc[5]=75;  c[5]=96;  fr[5]=1.00; d[5]="sierra2_4a"; st[5]=0;
+    sc[6]=70;  c[6]=128; fr[6]=1.00; d[6]="sierra2_4a"; st[6]=0;
+    sc[7]=70;  c[7]=96;  fr[7]=1.00; d[7]="sierra2_4a"; st[7]=1;
+    sc[8]=70;  c[8]=64;  fr[8]=1.00; d[8]="sierra2_4a"; st[8]=1;
+    sc[9]=70;  c[9]=64;  fr[9]=1.00; d[9]="none";       st[9]=1;
+    sc[10]=70; c[10]=64; fr[10]=0.80; d[10]="none";     st[10]=1;
+    sc[11]=70; c[11]=64; fr[11]=0.65; d[11]="none";     st[11]=1;
+    sc[12]=70; c[12]=64; fr[12]=0.50; d[12]="none";     st[12]=1;
 
     prev = "";
-    for (i = 0; i < 15; i++) {
+    for (i = 0; i < 13; i++) {
       s = clamp_scale(sc[i]);
       fps = int(fmax * fr[i] + 0.5);
       fps = clamp_fps(fps);
-      entry = s ":" c[i] ":" fps ":" d[i];
+      entry = s ":" c[i] ":" fps ":" d[i] ":" st[i];
       if (entry != prev) {
         print entry;
         prev = entry;
@@ -353,10 +407,10 @@ optimize_gif() {
   while [ "$lo" -le "$hi" ]; do
     local mid=$(( (lo + hi) / 2 ))
     local conf="${ladder[$mid]}"
-    local pct c f d
-    IFS=':' read -r pct c f d <<< "$conf"
+    local pct c f d st
+    IFS=':' read -r pct c f d st <<< "$conf"
 
-    render_gif_candidate "$src" "$raw_gif" "$canvas_w" "$canvas_h" "$pad_canvas" "$pct" "$f" "$c" "$d"
+    render_gif_candidate "$src" "$raw_gif" "$canvas_w" "$canvas_h" "$pad_canvas" "$pct" "$f" "$c" "$d" "$st"
     if [ "$HAS_GIFSICLE" -eq 1 ]; then
       gifsicle -O3 --lossy=80 "$raw_gif" -o "$cand_gif" 2>/dev/null || cp "$raw_gif" "$cand_gif"
     else
@@ -417,9 +471,9 @@ optimize_apng() {
   done < <(build_quality_ladder "$fps_max" "$fps_min" "$tmin" "$tmax" "$dur_int" "$min_scale_pct")
 
   # Pass 1: Full canvas, 256 colors, full FPS
-  local pct0 c0 f0 d0
-  IFS=':' read -r pct0 c0 f0 d0 <<< "${ladder[0]}"
-  render_apng_candidate "$src" "$out" "$canvas_w" "$canvas_h" "$pad_canvas" "$pct0" "$f0" "$c0" "$d0" "$max_dur" "$plays" "$fdir"
+  local pct0 c0 f0 d0 st0
+  IFS=':' read -r pct0 c0 f0 d0 st0 <<< "${ladder[0]}"
+  render_apng_candidate "$src" "$out" "$canvas_w" "$canvas_h" "$pad_canvas" "$pct0" "$f0" "$c0" "$d0" "$max_dur" "$plays" "$fdir" "$st0"
   local fsize
   fsize=$(get_filesize "$out")
   if [ "$fsize" -le "$max_size" ]; then
@@ -437,10 +491,10 @@ optimize_apng() {
   while [ "$lo" -le "$hi" ]; do
     local mid=$(( (lo + hi) / 2 ))
     local conf="${ladder[$mid]}"
-    local pct c f d
-    IFS=':' read -r pct c f d <<< "$conf"
+    local pct c f d st
+    IFS=':' read -r pct c f d st <<< "$conf"
 
-    render_apng_candidate "$src" "$cand_png" "$canvas_w" "$canvas_h" "$pad_canvas" "$pct" "$f" "$c" "$d" "$max_dur" "$plays" "$fdir"
+    render_apng_candidate "$src" "$cand_png" "$canvas_w" "$canvas_h" "$pad_canvas" "$pct" "$f" "$c" "$d" "$max_dur" "$plays" "$fdir" "$st"
     local s
     s=$(get_filesize "$cand_png")
     if [ "$s" -gt 0 ] && [ "$s" -le "$max_size" ]; then

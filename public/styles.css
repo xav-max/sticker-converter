@@ -1145,6 +1145,177 @@ summary:focus-visible {
     font-weight: 600;
 }
 
+/* 3-Background Preview Switcher */
+.staging-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+}
+
+.bg-switcher {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px;
+    background: var(--surface-soft);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+}
+
+.bg-switch-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 9px;
+    color: var(--muted);
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 11px;
+    font-weight: 600;
+    transition: all 140ms ease;
+}
+
+.bg-switch-btn:hover {
+    color: var(--text);
+}
+
+.bg-switch-btn.active {
+    color: #fff;
+    background: rgba(124, 140, 255, 0.22);
+    border-color: rgba(124, 140, 255, 0.55);
+}
+
+.bg-swatch {
+    width: 11px;
+    height: 11px;
+    border-radius: 3px;
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    flex: 0 0 auto;
+}
+
+.bg-swatch.transparent {
+    background-color: #162038;
+    background-image:
+        linear-gradient(45deg, rgba(255, 255, 255, 0.25) 25%, transparent 25%),
+        linear-gradient(-45deg, rgba(255, 255, 255, 0.25) 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, rgba(255, 255, 255, 0.25) 75%),
+        linear-gradient(-45deg, transparent 75%, rgba(255, 255, 255, 0.25) 75%);
+    background-size: 8px 8px;
+    background-position: 0 0, 0 4px, 4px -4px, -4px 0;
+}
+
+.bg-swatch.black {
+    background: #000000;
+}
+
+.bg-swatch.white {
+    background: #ffffff;
+}
+
+.sticker-thumb.clickable {
+    cursor: zoom-in;
+}
+
+.sticker-thumb.bg-black,
+.lightbox-stage.bg-black {
+    background-color: #000000 !important;
+    background-image: none !important;
+}
+
+.sticker-thumb.bg-white,
+.lightbox-stage.bg-white {
+    background-color: #ffffff !important;
+    background-image: none !important;
+}
+
+/* Lightbox Modal */
+.lightbox-modal {
+    width: min(92vw, 540px);
+    padding: 0;
+    color: var(--text);
+    background: linear-gradient(155deg, rgba(18, 29, 45, 0.99), rgba(11, 17, 31, 0.99));
+    border: 1px solid rgba(140, 160, 230, 0.3);
+    border-radius: 16px;
+    box-shadow: 0 28px 80px rgba(0, 0, 0, 0.65);
+    overflow: hidden;
+}
+
+.lightbox-modal::backdrop {
+    background: rgba(4, 7, 15, 0.78);
+    backdrop-filter: blur(6px);
+}
+
+.lightbox-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 15px 18px;
+    border-bottom: 1px solid var(--line);
+}
+
+.lightbox-title-wrap {
+    min-width: 0;
+}
+
+.lightbox-title {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 650;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.lightbox-sub {
+    margin: 2px 0 0;
+    color: var(--muted);
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+    font-size: 11px;
+}
+
+.lightbox-body {
+    padding: 18px;
+}
+
+.lightbox-stage {
+    display: grid;
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    max-height: 440px;
+    place-items: center;
+    padding: 18px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background-color: #0b1121;
+    background-image:
+        linear-gradient(45deg, rgba(255, 255, 255, 0.045) 25%, transparent 25%),
+        linear-gradient(-45deg, rgba(255, 255, 255, 0.045) 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, rgba(255, 255, 255, 0.045) 75%),
+        linear-gradient(-45deg, transparent 75%, rgba(255, 255, 255, 0.045) 75%);
+    background-size: 20px 20px;
+    background-position: 0 0, 0 10px, 10px -10px, -10px 0;
+}
+
+.lightbox-stage img,
+.lightbox-stage video {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+}
+
+.lightbox-footer {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: 14px;
+}
+
 @media (max-width: 760px) {
     body {
         padding: 22px 16px 40px;

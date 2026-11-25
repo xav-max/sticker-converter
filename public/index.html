@@ -118,7 +118,14 @@
                         <div id="stagingWrapper" style="display: none;">
                             <div class="staging-header">
                                 <div class="staging-count" id="stagingCount">0 stickers queued</div>
-                                <button type="button" id="clearAllBtn" class="ghost-btn">Clear all</button>
+                                <div class="staging-actions">
+                                    <div class="bg-switcher" role="group" aria-label="Preview background">
+                                        <button type="button" class="bg-switch-btn active" data-bg="transparent"><span class="bg-swatch transparent"></span>Transparent</button>
+                                        <button type="button" class="bg-switch-btn" data-bg="black"><span class="bg-swatch black"></span>Black</button>
+                                        <button type="button" class="bg-switch-btn" data-bg="white"><span class="bg-swatch white"></span>White</button>
+                                    </div>
+                                    <button type="button" id="clearAllBtn" class="ghost-btn">Clear all</button>
+                                </div>
                             </div>
                             <div class="sticker-grid" id="stagingGrid"></div>
                         </div>
@@ -175,6 +182,11 @@
                         <h2 id="resultsHeading">Converted stickers & downloads</h2>
                         <p id="resultsSummary">Ready to preview and download.</p>
                     </div>
+                    <div class="bg-switcher" role="group" aria-label="Preview background">
+                        <button type="button" class="bg-switch-btn active" data-bg="transparent"><span class="bg-swatch transparent"></span>Transparent</button>
+                        <button type="button" class="bg-switch-btn" data-bg="black"><span class="bg-swatch black"></span>Black</button>
+                        <button type="button" class="bg-switch-btn" data-bg="white"><span class="bg-swatch white"></span>White</button>
+                    </div>
                 </div>
 
                 <div class="download-bar" id="downloadBar"></div>
@@ -192,6 +204,27 @@
             </details>
         </main>
     </div>
+
+    <dialog id="lightboxModal" class="lightbox-modal" aria-labelledby="lightboxTitle">
+        <div class="lightbox-header">
+            <div class="lightbox-title-wrap">
+                <h3 id="lightboxTitle" class="lightbox-title">Sticker preview</h3>
+                <p id="lightboxSub" class="lightbox-sub"></p>
+            </div>
+            <button type="button" id="closeLightboxBtn" class="specs-close-btn" aria-label="Close preview">✕</button>
+        </div>
+        <div class="lightbox-body">
+            <div id="lightboxStage" class="lightbox-stage bg-transparent"></div>
+            <div class="lightbox-footer">
+                <div class="bg-switcher" role="group" aria-label="Preview background">
+                    <button type="button" class="bg-switch-btn active" data-bg="transparent"><span class="bg-swatch transparent"></span>Transparent</button>
+                    <button type="button" class="bg-switch-btn" data-bg="black"><span class="bg-swatch black"></span>Black</button>
+                    <button type="button" class="bg-switch-btn" data-bg="white"><span class="bg-swatch white"></span>White</button>
+                </div>
+                <a id="lightboxDownloadBtn" class="dl-btn primary" href="#" style="display: none;">Download sticker</a>
+            </div>
+        </div>
+    </dialog>
 
     <dialog id="specsModal" class="specs-modal" aria-labelledby="specsModalTitle">
         <div class="specs-modal-header">
@@ -274,6 +307,12 @@
         const openSpecsBtn = document.getElementById('openSpecsBtn');
         const closeSpecsBtn = document.getElementById('closeSpecsBtn');
         const specsModal = document.getElementById('specsModal');
+        const lightboxModal = document.getElementById('lightboxModal');
+        const lightboxTitle = document.getElementById('lightboxTitle');
+        const lightboxSub = document.getElementById('lightboxSub');
+        const lightboxStage = document.getElementById('lightboxStage');
+        const lightboxDownloadBtn = document.getElementById('lightboxDownloadBtn');
+        const closeLightboxBtn = document.getElementById('closeLightboxBtn');
 
         openSpecsBtn.addEventListener('click', () => {
             if (typeof specsModal.showModal === 'function') {
@@ -286,6 +325,63 @@
         specsModal.addEventListener('click', (e) => {
             if (e.target === specsModal) specsModal.close();
         });
+
+        closeLightboxBtn.addEventListener('click', () => lightboxModal.close());
+        lightboxModal.addEventListener('click', (e) => {
+            if (e.target === lightboxModal) lightboxModal.close();
+        });
+
+        let previewBg = 'transparent';
+
+        function applyPreviewBg(bg) {
+            previewBg = bg;
+            document.querySelectorAll('.bg-switch-btn').forEach((btn) => {
+                btn.classList.toggle('active', btn.dataset.bg === bg);
+            });
+            document.querySelectorAll('.sticker-thumb, #lightboxStage').forEach((el) => {
+                el.classList.remove('bg-transparent', 'bg-black', 'bg-white');
+                el.classList.add(`bg-${bg}`);
+            });
+        }
+
+        document.querySelectorAll('.bg-switch-btn').forEach((btn) => {
+            btn.addEventListener('click', () => applyPreviewBg(btn.dataset.bg || 'transparent'));
+        });
+
+        function openLightbox({ title, subtitle, src, isVideo, downloadUrl }) {
+            lightboxTitle.textContent = title;
+            lightboxSub.textContent = subtitle || '';
+            lightboxStage.innerHTML = '';
+            applyPreviewBg(previewBg);
+
+            if (isVideo) {
+                const vid = document.createElement('video');
+                vid.src = src;
+                vid.autoplay = true;
+                vid.loop = true;
+                vid.muted = true;
+                vid.playsInline = true;
+                lightboxStage.appendChild(vid);
+            } else {
+                const img = document.createElement('img');
+                img.src = src;
+                img.alt = title;
+                lightboxStage.appendChild(img);
+            }
+
+            if (downloadUrl) {
+                lightboxDownloadBtn.href = downloadUrl;
+                lightboxDownloadBtn.style.display = 'inline-flex';
+            } else {
+                lightboxDownloadBtn.style.display = 'none';
+            }
+
+            if (typeof lightboxModal.showModal === 'function') {
+                lightboxModal.showModal();
+            } else {
+                lightboxModal.setAttribute('open', '');
+            }
+        }
 
         const PLATFORM_META = {
             whatsapp: { label: 'WhatsApp', logo: '#logo-whatsapp', ext: '.gif' },
@@ -396,7 +492,7 @@
                 card.className = 'sticker-card';
 
                 const thumb = document.createElement('div');
-                thumb.className = 'sticker-thumb';
+                thumb.className = `sticker-thumb bg-${previewBg}${item.url ? ' clickable' : ''}`;
 
                 const lower = item.file.name.toLowerCase();
                 if (SPECIAL_LABELS[lower]) {
@@ -439,6 +535,15 @@
                         dimSpan.textContent = `${img.naturalWidth}×${img.naturalHeight}`;
                     };
                     thumb.appendChild(img);
+                    thumb.addEventListener('click', (e) => {
+                        if (e.target.closest('.card-remove')) return;
+                        openLightbox({
+                            title: item.file.name,
+                            subtitle: `${formatBytes(item.file.size)} · ${dimSpan.textContent}`,
+                            src: item.url,
+                            isVideo: false,
+                        });
+                    });
                 } else {
                     const zipBadge = document.createElement('div');
                     zipBadge.className = 'sticker-zip-badge';
@@ -633,7 +738,7 @@
                     card.className = 'sticker-card';
 
                     const thumb = document.createElement('div');
-                    thumb.className = 'sticker-thumb';
+                    thumb.className = `sticker-thumb clickable bg-${previewBg}`;
 
                     const badge = document.createElement('span');
                     badge.className = 'result-platform-badge';
@@ -689,6 +794,19 @@
 
                     card.appendChild(thumb);
                     card.appendChild(cardMeta);
+                    thumb.addEventListener('click', (e) => {
+                        if (e.target.closest('.result-dl-icon')) return;
+                        const sizeInfo = file.limit
+                            ? `${formatBytes(file.size)} / ${formatBytes(file.limit)} (${file.passed ? 'PASS' : 'OVER'})`
+                            : formatBytes(file.size);
+                        openLightbox({
+                            title: `${meta.label} · ${file.name}`,
+                            subtitle: sizeInfo,
+                            src: file.previewUrl,
+                            isVideo: file.ext === '.webm',
+                            downloadUrl: file.downloadUrl,
+                        });
+                    });
                     resultsGrid.appendChild(card);
                 });
             });
