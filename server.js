@@ -4,6 +4,7 @@ const AdmZip = require('adm-zip');
 const { spawn } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+const zlib = require('zlib');
 
 const app = express();
 const port = 8080;
@@ -260,6 +261,28 @@ app.get('/preview/:sessionId/:platform/:filename', (req, res) => {
         ext === '.webm' ? 'video/webm' : 'application/octet-stream';
     res.setHeader('Content-Type', mime);
     res.setHeader('Cache-Control', 'no-store');
+
+    // LINE APNGs have finite plays (1-4 loops) which freeze in browser previews;
+    // patch acTL num_plays=0 in memory for inline preview only (downloads stay spec-compliant).
+    if (platform === 'line' && ext === '.png') {
+        const buf = fs.readFileSync(filePath);
+        if (buf.length > 8) {
+            let i = 8;
+            while (i + 12 <= buf.length) {
+                const len = buf.readUInt32BE(i);
+                const type = buf.toString('ascii', i + 4, i + 8);
+                if (type === 'acTL' && len === 8 && i + 20 <= buf.length) {
+                    buf.writeUInt32BE(0, i + 12);
+                    const crc = zlib.crc32(buf.subarray(i + 4, i + 16));
+                    buf.writeUInt32BE(crc >>> 0, i + 16);
+                    break;
+                }
+                i += 12 + len;
+            }
+        }
+        return res.send(buf);
+    }
+
     res.sendFile(filePath);
 });
 

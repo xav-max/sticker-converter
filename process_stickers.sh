@@ -904,7 +904,7 @@ while IFS= read -r -d '' INPUT; do
   fi
 
   (
-    optimize_apng "LINE" "$WORK_DIR/src_line.mkv" "$OUT_LINE" "$MAX_LINE" "$LINE_W" "$LINE_H" 0 "$LINE_FPS" "1" "$LINE_DUR" "$LINE_PLAYS" "5" "20" "$LINE_DUR" 70 "$WORK_DIR" \
+    optimize_apng "LINE" "$WORK_DIR/src_line.mkv" "$OUT_LINE" "$MAX_LINE" "$LINE_W" "$LINE_H" 0 "$LINE_FPS" "1" "$LINE_DUR" "$LINE_PLAYS" "5" "20" "$LINE_DUR" 100 "$WORK_DIR" \
       > "$WORK_DIR/log_line.txt" 2>&1 || touch "$WORK_DIR/fail_line"
   ) & PIDS+=($!)
 
