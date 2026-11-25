@@ -844,7 +844,7 @@ process_static_sticker() {
       -vf "scale=240:240:flags=lanczos:force_original_aspect_ratio=decrease,split[s0][s1];[s0]palettegen=max_colors=256:reserve_transparent=1[p];[s1][p]paletteuse" \
       "$OUTPUT_DIR/wechat/${basename_noext}_wechat.gif"
 
-    ffmpeg -nostdin -y -v error -loop 1 -i "$src_512" -t 0.2 -r 10 \
+    ffmpeg -nostdin -y -v error -loop 1 -framerate 10 -t 0.2 -i "$src_512" \
       -vf "scale=512:512:flags=lanczos:force_original_aspect_ratio=decrease,scale='trunc(iw/2)*2':'trunc(ih/2)*2'" \
       -c:v libvpx-vp9 -pix_fmt yuva420p -auto-alt-ref 0 -b:v 200k -an "$OUTPUT_DIR/telegram/${basename_noext}_telegram.webm"
 
@@ -857,9 +857,9 @@ process_static_sticker() {
 
     # GIPHY requires >= 2 frames, loop=0 (Forever), transparent background (>= 20% 1st frame)
     local out_giphy="$OUTPUT_DIR/giphy/${basename_noext}_giphy.gif"
-    ffmpeg -nostdin -y -v error -loop 1 -i "$src_512" -t 1 -r 2 \
-      -filter_complex "[0:v]scale=512:512:flags=lanczos:force_original_aspect_ratio=decrease,pad=512:512:(ow-iw)/2:(oh-ih)/2:color=0x00000000,split[s0][s1];[s0]palettegen=max_colors=256:reserve_transparent=1[p];[s1][p]paletteuse" \
-      -loop 0 "$work/giphy_static.gif"
+    ffmpeg -nostdin -y -v error -i "$src_512" \
+      -filter_complex "[0:v]scale=512:512:flags=lanczos:force_original_aspect_ratio=decrease,pad=512:512:(ow-iw)/2:(oh-ih)/2:color=0x00000000,loop=loop=1:size=1:start=0,setpts=N/2/TB,split[s0][s1];[s0]palettegen=max_colors=256:reserve_transparent=1[p];[s1][p]paletteuse" \
+      -r 2 -loop 0 "$work/giphy_static.gif"
     if [ "$HAS_GIFSICLE" -eq 1 ]; then
       gifsicle -O3 --loopcount=0 "$work/giphy_static.gif" -o "$out_giphy" 2>/dev/null || cp "$work/giphy_static.gif" "$out_giphy"
     else
@@ -868,7 +868,10 @@ process_static_sticker() {
     local g_size transp_pct
     g_size=$(get_filesize "$out_giphy")
     transp_pct=$(check_first_frame_transparency "$src_512" "$work")
-    if [ "$transp_pct" -lt 20 ]; then
+    if [ "$g_size" -le 0 ]; then
+      echo "[GIPHY] WARNING: Failed to generate GIPHY GIF (0 bytes)."
+      FAILED_CONVERSIONS=$((FAILED_CONVERSIONS + 1))
+    elif [ "$transp_pct" -lt 20 ]; then
       mark_below_floor "$out_giphy"
       echo "[GIPHY] WARNING: 1st frame transparency is ${transp_pct}% (< 20% required by GIPHY). Size: $g_size bytes (2 frames, loop=0)."
     else
