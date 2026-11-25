@@ -82,6 +82,17 @@ build_scale_filter() {
   fi
 }
 
+build_pre_vf() {
+  local fps="$1"
+  local sf="$2"
+  local stabilize="${3:-0}"
+  if [ "$stabilize" -eq 1 ]; then
+    echo "fps=${fps},${sf},format=rgba,split[sa][sc];[sc]format=yuv444p,atadenoise=0a=0.02:0b=0.04:1a=0.02:1b=0.04:2a=0.02:2b=0.04,format=rgb24[scd];[sa]alphaextract[sal];[scd][sal]alphamerge,format=rgba"
+  else
+    echo "fps=${fps},${sf}"
+  fi
+}
+
 # Render GIF using stats_mode=full so static areas (hair, outfits) keep full palette colors
 render_gif_candidate() {
   local src="$1"
@@ -95,12 +106,9 @@ render_gif_candidate() {
   local dither="$9"
   local stabilize="${10:-0}"
 
-  local sf
+  local sf pre_vf
   sf=$(build_scale_filter "$canvas_w" "$canvas_h" "$scale_pct" "$pad_canvas")
-  local pre_vf="fps=${fps},${sf}"
-  if [ "$stabilize" -eq 1 ]; then
-    pre_vf="fps=${fps},${sf},split[sa][sc];[sc]format=yuv444p,atadenoise=0a=0.02:0b=0.04:1a=0.02:1b=0.04:2a=0.02:2b=0.04,format=rgb24[scd];[sa]alphaextract[sal];[scd][sal]alphamerge,format=rgba"
-  fi
+  pre_vf=$(build_pre_vf "$fps" "$sf" "$stabilize")
   local vf="[0:v]${pre_vf},split[s0][s1];[s0]palettegen=max_colors=${colors}:stats_mode=full:reserve_transparent=1[p];[s1][p]paletteuse=dither=${dither}:diff_mode=rectangle"
   ffmpeg -nostdin -y -v error -i "$src" -filter_complex "$vf" "$out"
 }
@@ -121,13 +129,9 @@ render_apng_candidate() {
   local fdir="${12}"
   local stabilize="${13:-0}"
 
-  local sf
+  local sf pre_vf
   sf=$(build_scale_filter "$canvas_w" "$canvas_h" "$scale_pct" "$pad_canvas")
-
-  local pre_vf="fps=${fps},${sf}"
-  if [ "$stabilize" -eq 1 ]; then
-    pre_vf="fps=${fps},${sf},split[sa][sc];[sc]format=yuv444p,atadenoise=0a=0.02:0b=0.04:1a=0.02:1b=0.04:2a=0.02:2b=0.04,format=rgb24[scd];[sa]alphaextract[sal];[scd][sal]alphamerge,format=rgba"
-  fi
+  pre_vf=$(build_pre_vf "$fps" "$sf" "$stabilize")
 
   local dur_args=()
   if [ -n "$max_dur" ]; then
@@ -140,8 +144,7 @@ render_apng_candidate() {
     local pal_raw="$fdir/pal.raw"
     local pal_png="$fdir/pal.png"
 
-    # Count frames first by rendering clean PNGs or computing sprite grid
-    ffmpeg -nostdin -y -v error -i "$src" -vf "$pre_vf" "${dur_args[@]}" "$fdir/raw_%04d.png"
+    ffmpeg -nostdin -y -v error -i "$src" -filter_complex "[0:v]${pre_vf}" "${dur_args[@]}" "$fdir/raw_%04d.png"
     local n_frames
     n_frames=$(ls -1 "$fdir"/raw_*.png 2>/dev/null | wc -l | tr -d ' ')
     if [ "$n_frames" -gt 0 ]; then
@@ -481,6 +484,12 @@ optimize_apng() {
     return 0
   fi
 
+  local smallest_png="$work/${label}_smallest.png"
+  local smallest_size="$fsize"
+  if [ "$fsize" -gt 0 ]; then
+    cp "$out" "$smallest_png"
+  fi
+
   # Binary search over quality-preserving ladder
   local lo=1
   local hi=$(( ${#ladder[@]} - 1 ))
@@ -494,9 +503,14 @@ optimize_apng() {
     local pct c f d st
     IFS=':' read -r pct c f d st <<< "$conf"
 
+    rm -f "$cand_png"
     render_apng_candidate "$src" "$cand_png" "$canvas_w" "$canvas_h" "$pad_canvas" "$pct" "$f" "$c" "$d" "$max_dur" "$plays" "$fdir" "$st"
     local s
     s=$(get_filesize "$cand_png")
+    if [ "$s" -gt 0 ] && { [ "$smallest_size" -eq 0 ] || [ "$s" -lt "$smallest_size" ]; }; then
+      cp "$cand_png" "$smallest_png"
+      smallest_size="$s"
+    fi
     if [ "$s" -gt 0 ] && [ "$s" -le "$max_size" ]; then
       cp "$cand_png" "$best_png"
       found=1
@@ -514,7 +528,9 @@ optimize_apng() {
     return 0
   fi
 
-  cp "$cand_png" "$out" 2>/dev/null || true
+  if [ -s "$smallest_png" ]; then
+    cp "$smallest_png" "$out"
+  fi
   local final_s
   final_s=$(get_filesize "$out")
   echo "[$label] WARNING: Could not shrink below $max_size bytes (best: $final_s bytes)."
